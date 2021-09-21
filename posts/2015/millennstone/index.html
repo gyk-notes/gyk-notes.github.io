@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - Millennstone</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>Millennstone</h1>
+            <div class="info">
+    Posted on January 31, 2015
+    
+</div>
+<div class="info">
+    
+    Tags: 
+    
+</div>
+
+<p>偶然发现的：到2015年2月1日零点为止，新千年一共流逝了123456小时：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>$ <span class="va">date0=$(</span><span class="fu">date</span> -u -d 2001/1/1 +%s<span class="va">)</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>$ <span class="va">date1=$(</span><span class="fu">date</span> -u -d 2015/2/1 +%s<span class="va">)</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>$ <span class="bu">echo</span> <span class="va">$((</span> (date1-date0)/3600 <span class="va">))</span> <span class="st">&quot;hours&quot;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a><span class="ex">123456</span> hours</span></code></pre></div>
+<p>巧合的地方在于，123456 是 “1234567890” 的所有前缀中唯一能被24整除的数，而且从本世纪的第一天2001年1月1日经过123456/24天后恰好还是整月份。感觉很有趣。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

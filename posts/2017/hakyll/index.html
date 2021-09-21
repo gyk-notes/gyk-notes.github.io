@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 搭建Hakyll博客</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>搭建Hakyll博客</h1>
+            <div class="info">
+    Posted on August  3, 2017
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>说起来我这个 blog 真是命途多舛。遥想当年公元二〇〇八天朝大运动会，万邦来朝，防火长城也开放怀抱迎接外宾。感谢皇恩浩荡，我就是在那时候第一次注册了 Blogger.com。可惜刚配置好的模板还没用习惯，大运动会闭幕不久 Blogger 又被封了， ♫ I can’t believe the end has come / When friendship’s just begun. 后来在 WordPress、Tumblr 等站的短暂解禁期，多次尝试切换到新平台上。每次迁移都要导入数据、调整格式，折腾半天。但每次事后都证明只是又一次 GFW 技术维护。痛定思痛，最后我总结了一下，只有自己掌控数据才靠谱，就算被封也能够一键搬家。</p>
+<p>这几年用静态网站生成器做 blog 的方式很流行。除了能自己拥有数据，自由度也相当高，可以在页面上挂<del>木马</del>跑马灯特效，不像主流博客网站只有 Blogger 和 cnblogs 支持嵌入 JavaScript。一开始我用的是 Python 写的 Pelican，但是发现对 Markdown 的支持不算太好，于是就干脆切换到基于 Pandoc 的 Hakyll。</p>
+<p>Hakyll 与其说是一个 static site generator，倒不如说是一套用来定制 static site generator 的 Haskell eDSL 库。虽说是 eDSL，但 Haskell 代码不像 Python 那样直白，对于没有获得过范畴论 PhD 的程序员来说上手还是有点难，它主页上最简单的例子就把我看懵了：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>main <span class="ot">=</span> hakyllWith config <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>    match <span class="st">&quot;*.markdown&quot;</span> <span class="op">$</span> <span class="kw">do</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>        route   <span class="op">$</span> setExtension <span class="st">&quot;html&quot;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>        compile <span class="op">$</span> pandocCompiler</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>            <span class="op">&gt;&gt;=</span> loadAndApplyTemplate <span class="st">&quot;templates/default.html&quot;</span> defaultCtx</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>            <span class="op">&gt;&gt;=</span> relativizeUrls</span></code></pre></div>
+<p>几个疑问：</p>
+<ul>
+<li><code>match</code> 是怎么定义的，为什么后面可以接 <code>do</code></li>
+<li><code>route</code> 又是什么</li>
+<li><code>compile</code> 如何工作，为什么能和 <code>route</code> 并列</li>
+<li>编译、应用模板和处理 URL 的操作为什么可以用 <code>&gt;&gt;=</code> 连接</li>
+</ul>
+<p>为了理解这些代码只好去读 Hakyll（v4.9.2）的源码，先看一下 <a href="https://github.com/jaspervdj/hakyll/blob/hakyll-4.9.2.0/web/tutorials/a-guide-to-the-hakyll-module-zoo.markdown">A Guide to the Hakyll Module Zoo</a>，了解 Hakyll 的架构：</p>
+<ul>
+<li><code>Compiler</code> 类型是一个 Monad，输入一个执行环境 <code>CompilerRead</code>，返回该步编译结果 <code>IO (CompilerResult a)</code>。</li>
+<li>各种 <code>Compiler</code> 相关类型：
+<ul>
+<li><code>CompilerRead</code>: 封装了 <code>Compiler</code> 的执行环境，比如配置（<code>compilerConfig</code>），存储（<code>compilerStore</code>），日志（<code>compilerLogger</code>）等。</li>
+<li><code>CompilerWrite</code>： <code>Compiler</code> 编译依赖和缓存命中，是一个 Monoid</li>
+<li><code>CompilerResult</code>: GADT, 表示当前编译状态，具体类型可以有好几种：
+<ul>
+<li><code>CompilerDone</code>：表示编译完成，第一个字段是 <code>a</code>，也就是 <code>Compiler a</code> 里的 <code>a</code></li>
+<li><code>CompilerSnapshot</code>：生成一个 Snapshot，再返回一个 <code>Compiler a</code></li>
+<li><code>CompilerError</code>：字符串数组，表示错误信息</li>
+<li><code>CompilerRequire</code>：表示依赖的 Snapshot</li>
+</ul></li>
+</ul></li>
+<li><code>Compiler</code> 类型里封装的函数是 <code>unCompiler</code>，使用方式其实就是Haskell combinator的惯用法，比如State Monad用的 <code>runState</code>，Parser Monad用的 <code>runParser</code>。如果不理解可以去看《Real World Haskell》第十章 “Parsing a binary data format”。不叫 <code>runCompiler</code> 是因为有一个同签名的 <code>runCompiler</code> 函数，封装了错误处理。</li>
+<li>类似的，<code>Rules</code> 类型里封装的函数是 <code>unRules :: RWST RulesRead RuleSet RulesState IO a</code>。 <code>RWST</code> 是一个 Monad Transformer，在这里用来给 IO Monad 提供 <code>Reader</code>（只读）、<code>Writer</code>（只写）和 <code>State</code>（读写）支持。 <code>Rules</code> 通过自动派生 <code>deriving (Monad, Functor, Applicative)</code> 实现了 <code>Monad</code> 等 type classes。</li>
+<li><code>Routes</code> 类型里封装的函数是 <code>unRoutes :: RoutesRead -&gt; Identifier -&gt; IO (Maybe FilePath, UsedMetadata)</code>。 <!-- - `data RulesState` 包含了 `rulesRoute` 和 `rulesCompiler` 两个字段，分别表示路由和编译的规则。 --></li>
+</ul>
+<p>接下来就可以回答前面的问题了：</p>
+<ol type="1">
+<li><code>Compiler</code> / <code>Rules</code> / <code>Routes</code> 都用这样类似的设计是为了可组合性，以便写出嵌套的规则。</li>
+<li><code>match</code> 的定义是 <code>match :: Pattern -&gt; Rules () -&gt; Rules ()</code>，第一个参数代表由通配符、正则表达式或集合（比如 <code>fromList ["about.md", "contact.md", "projects.md"])</code>）等方式给出的匹配模式；然后和第二个参数的 <code>Rules</code> 组合成新的 <code>Rules</code>。</li>
+<li><code>match pattern</code>, <code>route routes</code> 以及 <code>compile compiler</code> 的返回值都是 <code>Rules ()</code>，所以可以任意组合。就像文档里写的那样，“The convention is to just list all items in the ‘Rules’ monad, routes and compilation rules.” <code>Rules</code> 类型是实现整个 eDSL 的主干。这几个函数都定义在 <code>Hakyll.Core.Rules</code> 模块中。</li>
+<li>回到 Hakyll 的示例代码，这里有两种 monad：外层的 <code>Rules</code> 和内层的 <code>Compiler</code>。外层用 <code>do</code>-notation，内层用 <code>&gt;&gt;=</code> 连接起来。</li>
+</ol>
+<p>了解了基本原理之后，就可以开始动手写代码了。对于 Haskell 这样只要写个带记忆的函数就能发 paper 的语言，搭建博客这么复杂的事情肯定有不少<a href="https://jaspervdj.be/hakyll/tutorials.html">教程</a>。我主要参考的是 <a href="https://github.com/yogsototh/yblog">yogsototh/yblog</a> 和 <a href="https://github.com/blaenk/blaenk.github.io">blaenk.github.io</a> 的教程和源码。</p>
+<p>在定制的过程中，Pandoc 的强大之处就体现出来了。比如按 Markdown 标准，单个换行符分开的行输出后会拼接成连续的一行，但连接时中文字符之间并不需要插入空格。这时候就可以开启 Pandoc 的 <code>Ext_east_asian_line_breaks</code> 选项。还有数学公式显示、脚注等等，都可以随心配置：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a>pandocCustomCompiler <span class="ot">=</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>  <span class="kw">let</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>    writerOptions <span class="ot">=</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>      <span class="kw">let</span> mathExtensions <span class="ot">=</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>            [ <span class="dt">Ext_tex_math_dollars</span>  <span class="co">-- $..$ or $$..$$</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>            , <span class="dt">Ext_footnotes</span> ]</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>          defaultExtensions <span class="ot">=</span> writerExtensions defaultHakyllWriterOptions</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>          newExtensions <span class="ot">=</span> <span class="fu">foldr</span> S.insert defaultExtensions mathExtensions</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>      <span class="kw">in</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>        defaultHakyllWriterOptions</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a>        { writerExtensions <span class="ot">=</span> newExtensions</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a>        , writerHTMLMathMethod <span class="ot">=</span> <span class="dt">MathJax</span> <span class="st">&quot;&quot;</span> }</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a>    readerOptions <span class="ot">=</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a>      <span class="kw">let</span> cjkExtensions <span class="ot">=</span> [ <span class="dt">Ext_east_asian_line_breaks</span> ]</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true"></a>          defaultExtensions <span class="ot">=</span> readerExtensions defaultHakyllReaderOptions</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true"></a>          newExtensions <span class="ot">=</span> <span class="fu">foldr</span> S.insert defaultExtensions cjkExtensions</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true"></a>      <span class="kw">in</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true"></a>        defaultHakyllReaderOptions</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true"></a>        { readerExtensions <span class="ot">=</span> newExtensions }</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true"></a>  <span class="kw">in</span> pandocCompilerWith readerOptions writerOptions</span></code></pre></div>
+<p>最后的效果如本页面所示。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

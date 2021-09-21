@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 播放器“co located POCs unavailable”错误分析</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>播放器“co located POCs unavailable”错误分析</h1>
+            <div class="info">
+    Posted on March  9, 2019
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'AV'." href="../../../tags/AV.html">AV</a>
+    
+</div>
+
+<p><strong>问题</strong>：用 libavcodec 内核的播放器（比如 mpv/IINA，VLC）播放 SBTV（国内某卫视频道，为保护客户隐私使用化名）的 RTMP 直播视频，报出多条 “h264: co located POCs unavailable” 错误。</p>
+<p><strong>tl;dr</strong>: 错误原因是视频流丢帧导致解码 B 帧时找不到对应的 co-located 图像。</p>
+<p>以下是详细分析。</p>
+<h2 id="相关概念">相关概念</h2>
+<p>为了理解 “co located POCs unavailable” 的意义，先要介绍 co-located 和 POC 这两个概念。</p>
+<h3 id="co-located">Co-located</h3>
+<p>B 帧 Direct 预测模式有两种，Temporal 和 Spatial（时间/空间）。SBTV 的 H.264 流只用了后者。 Co-located 图像指的是 B 帧在 direct 模式下向后参考图像列表的第一帧，即<code>refList[1][0]</code>。一般认为这一帧的运动特征是和当前帧最接近的。Spatial 模式下宏块的运动向量通常由同一帧内的几个邻块推算出，但是为了处理邻块运动而当前块静止的情况，需要先访问 co-located 图像中的对应宏块来判断当前块是否静止，如果静止则直接把运动向量赋值为0。</p>
+<p>详细解释见 H.264 标准 8.4.1.2，也可以参考：</p>
+<ul>
+<li><a href="https://www.cnblogs.com/TaigaCon/p/3677540.html">h.264直接预测</a></li>
+<li><a href="http://ramugedia.com/upload/8028/documents/AVC_skip_direct_ver.pdf">MPEG-4 AVC/H.264 Skip Direct Mode</a></li>
+</ul>
+<h3 id="poc">POC</h3>
+<p>POC 是 Picture Order Count（图像序列号）的缩写。H.264 中有 POC 和 FrameNum 两个概念：</p>
+<ul>
+<li>FrameNum：解码顺序。对于 IDR 帧 FrameNum 重置为0，其他帧 FrameNum 是上一参考帧的值加1。</li>
+<li>POC：播放顺序。IDR 帧 POC = 0。POC 有三种计算方式，SBTV 只用了 Type 0，表示 POC 的 LSB 部分（<code>pic_order_cnt_lsb</code>）显式在 slice header 中发送。</li>
+</ul>
+<p>POC 的计算对于 temporal direct 模式比较重要，见 H.264 标准 Figure 8-2。在 spatial direct 模式下 POC 只是在计算 <code>H264SliceContext.col_parity</code> 的时候用到。这是一个和场编码相关的概念，但是 SBTV 的编码器只用了帧编码，也就是说我们计算 B 帧的运动向量实际上并不需要 POC 的值。“POCs unavailable” 更重要的意义是指示 co-located 图像不可用。</p>
+<p>详细解释见 H.264 标准 8.2.1 和 8.2.4.1，也可以参考：</p>
+<ul>
+<li><a href="https://www.vcodex.com/h264avc-picture-management/">H.264/AVC Picture Management</a></li>
+</ul>
+<h2 id="错误原因">错误原因</h2>
+<p>当播放端输出 “co located POCs unavailable” 错误日志的时候有两种情况：</p>
+<ol type="1">
+<li>刚刚连接上 RTMP 流。这种情况一般是正常的，播放端可能一开始就收到 B 帧，该帧所参考的 co-located 帧并没有发送，所以提示无效。有些 RTMP 服务器会重传参考帧，但是通常不会重传整个 GOP，尤其是 SBTV 这种 IDR 间隔很长的情况。</li>
+<li>在拉流的过程中间出现。假设编码器没有问题，就说明视频流在转发过程中有丢帧现象。</li>
+</ol>
+<h3 id="为什么-rtmp-也会丢帧">为什么 RTMP 也会丢帧？</h3>
+<p>RTMP 基于 TCP，在传输过程中不会丢包。但是因为 RTMP 不支持变码率，当带宽不够的时候，服务器的发送队列将不断增长，只能选择丢弃队列中时间戳较早或包含非参考帧的 RTMP 包。</p>
+<h3 id="如何知道出现了丢帧">如何知道出现了丢帧？</h3>
+<p>正常情况下，H.264 每一帧的 <code>frame_num</code> 字段应该是上一参考帧加1（IDR 的时候重置0）。如果我们发现 <code>frame_num</code> 增量超过1，就说明有丢帧发生。这种情况在 H.264 标准里也有说明（对于 SBTV 的编码器 <code>gaps_in_frame_num_value_allowed_flag</code> 总是为0）：</p>
+<blockquote>
+<p>8.2.5.2</p>
+<p>NOTE 2 – This process can only be invoked for a conforming bitstream when gaps_in_frame_num_value_allowed_flag is equal to 1. When gaps_in_frame_num_value_allowed_flag is equal to 0 and frame_num is not equal to PrevRefFrameNum and is not equal to ( PrevRefFrameNum + 1 ) % MaxFrameNum, the decoding process should infer <strong>an unintentional loss of pictures</strong>.</p>
+</blockquote>
+<p>可以用 <a href="https://github.com/aizvorski/h264bitstream/">h264bitstream</a> 这个工具输出 <code>frame_num</code>：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="ex">curl</span> http://<span class="va">$STREAM_ADDR</span>.flv -o <span class="va">$MOVIE</span>.flv  # HTTP-FLV</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="ex">ffmpeg</span> -i <span class="va">$MOVIE</span>.flv -c copy -bsf:v -an h264_mp4toannexb <span class="va">$VIDEO</span>.264</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a><span class="va">$H264BITSTREAM</span><span class="ex">/h264_analyze</span> -v 1 <span class="va">$VIDEO</span>.264 <span class="kw">|</span> <span class="ex">rg</span> <span class="st">'frame_num:'</span></span></code></pre></div>
+<p>SBTV 的一个示例输出：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a>...</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a><span class="fl">1.1</span>: sh-&gt;frame_num: <span class="dv">11</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a><span class="fl">1.1</span>: sh-&gt;frame_num: <span class="dv">11</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a><span class="fl">2.7</span>: sh-&gt;frame_num: <span class="dv">12</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a><span class="fl">1.1</span>: sh-&gt;frame_num: <span class="dv">15</span>  <span class="co">// &lt;-- 丢帧</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a><span class="fl">1.1</span>: sh-&gt;frame_num: <span class="dv">15</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a><span class="fl">1.1</span>: sh-&gt;frame_num: <span class="dv">15</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a><span class="fl">1.1</span>: sh-&gt;frame_num: <span class="dv">16</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a><span class="fl">1.1</span>: sh-&gt;frame_num: <span class="dv">16</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>...</span></code></pre></div>
+<p>FFmpeg 在解码过程中如果发现 FrameNum 不连续，会输出 DEBUG 信息 “Frame num gap <code>curr_frame_num</code> <code>prev_frame_num</code>”，然后执行 Error Concealment 逻辑，把前一帧复制一份代替丢失的帧： <a href="%3Chttps://github.com/FFmpeg/FFmpeg/blob/n3.4.2/libavcodec/h264_slice.c#L1527">h264_slice.c:h264_field_start</a>。但是该帧的 POC （严格的说是 <code>field_poc</code> 字段）还是初始值，所以在执行到 direct 预测的时候就会报错。</p>
+<h2 id="示例日志">示例日志</h2>
+<p>以下日志由 <code>ffmpeg -loglevel trace -debug mmco -i $VIDEO -f null /dev/null</code> 输出（删除了无用或者有误导性的部分）。</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a>================================</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>h264_decode_frame</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>nal_unit_type: <span class="dv">9</span>, nal_ref_idc: <span class="dv">0</span>  <span class="co">// AUD</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>nal_unit_type: <span class="dv">7</span>, nal_ref_idc: <span class="dv">3</span>  <span class="co">// SPS</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>nal_unit_type: <span class="dv">8</span>, nal_ref_idc: <span class="dv">3</span>  <span class="co">// PPS</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a>nal_unit_type: <span class="dv">6</span>, nal_ref_idc: <span class="dv">0</span>  <span class="co">// SEI</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a>nal_unit_type: <span class="dv">1</span>, nal_ref_idc: <span class="dv">2</span>  <span class="co">// NonIDR，nal_ref_idc = 2 表示被其他帧参考的 P 帧</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true"></a>h264_slice_header_parse</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true"></a>Decode slice, frame_num = <span class="dv">12</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true"></a>Set pic_field_poc[<span class="dv">0</span>] = <span class="dv">65569</span>, [<span class="dv">1</span>] = <span class="dv">65569</span>  <span class="co">// 设置当前的 POC（初始值是65536）</span></span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true"></a></span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true"></a><span class="co">// 这里打印出短期参考图像列表。**SBTV 的流没有用到长期参考列表**。</span></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true"></a><span class="dt">short</span> term list:</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true"></a>    <span class="dv">0</span> fn:<span class="dv">10</span> poc:<span class="dv">65563</span> <span class="bn">0x10fee3000</span>  <span class="co">// 位于列表的索引0处，FrameNum = 10，POC = 65563</span></span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true"></a>    <span class="dv">1</span> fn:<span class="dv">9</span> poc:<span class="dv">65560</span> <span class="bn">0x10fae4000</span></span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true"></a>    <span class="dv">2</span> fn:<span class="dv">8</span> poc:<span class="dv">65557</span> <span class="bn">0x110f10000</span></span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true"></a>    <span class="dv">3</span> fn:<span class="dv">7</span> poc:<span class="dv">65555</span> <span class="bn">0x110ae0000</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true"></a></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true"></a><span class="co">// **SBTV 的流没有任何显式 MMCO 操作**。当 H.264 slice header 中没有 MMCO 字段的时候，用 FIFO 队</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true"></a><span class="co">// 列自动管理参考图像列表。这里的 mmco 是由 FFmpeg 的 `generate_sliding_window_mmcos` 函数生成的等效</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true"></a><span class="co">// MMCO = 1 操作序列，目的是复用同一套处理逻辑。</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true"></a>mmco:<span class="dv">1</span> <span class="dv">7</span> <span class="dv">0</span>  <span class="co">// 删除 FrameNum = 7 的短期参考</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true"></a>mmco: unref <span class="dt">short</span> <span class="dv">7</span> count <span class="dv">4</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true"></a>remove <span class="dt">short</span> <span class="dv">7</span> count <span class="dv">4</span></span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true"></a>fn <span class="dv">7</span> removed</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true"></a><span class="dt">short</span> term list:</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true"></a>    <span class="dv">0</span> fn:<span class="dv">10</span> poc:<span class="dv">65563</span> <span class="bn">0x10fee3000</span></span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true"></a>    <span class="dv">1</span> fn:<span class="dv">9</span> poc:<span class="dv">65560</span> <span class="bn">0x10fae4000</span></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true"></a>    <span class="dv">2</span> fn:<span class="dv">8</span> poc:<span class="dv">65557</span> <span class="bn">0x110f10000</span></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true"></a></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true"></a><span class="co">// 当前帧的 FrameNum = 12，加入列表</span></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true"></a><span class="dt">short</span> term list:</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true"></a>    <span class="dv">0</span> fn:<span class="dv">12</span> poc:<span class="dv">65569</span> <span class="bn">0x1106e1000</span></span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true"></a>    <span class="dv">1</span> fn:<span class="dv">10</span> poc:<span class="dv">65563</span> <span class="bn">0x10fee3000</span></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true"></a>    <span class="dv">2</span> fn:<span class="dv">9</span> poc:<span class="dv">65560</span> <span class="bn">0x10fae4000</span></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true"></a>    <span class="dv">3</span> fn:<span class="dv">8</span> poc:<span class="dv">65557</span> <span class="bn">0x110f10000</span></span>
+<span id="cb3-38"><a href="#cb3-38" aria-hidden="true"></a></span>
+<span id="cb3-39"><a href="#cb3-39" aria-hidden="true"></a><span class="co">// 到此为止是正常的</span></span>
+<span id="cb3-40"><a href="#cb3-40" aria-hidden="true"></a>================================</span>
+<span id="cb3-41"><a href="#cb3-41" aria-hidden="true"></a>h264_decode_frame</span>
+<span id="cb3-42"><a href="#cb3-42" aria-hidden="true"></a>nal_unit_type: <span class="dv">9</span>, nal_ref_idc: <span class="dv">0</span>  <span class="co">// AUD</span></span>
+<span id="cb3-43"><a href="#cb3-43" aria-hidden="true"></a>nal_unit_type: <span class="dv">6</span>, nal_ref_idc: <span class="dv">0</span>  <span class="co">// SEI</span></span>
+<span id="cb3-44"><a href="#cb3-44" aria-hidden="true"></a>nal_unit_type: <span class="dv">1</span>, nal_ref_idc: <span class="dv">0</span>  <span class="co">// NonIDR，nal_ref_idc = 0 表示非参考帧</span></span>
+<span id="cb3-45"><a href="#cb3-45" aria-hidden="true"></a></span>
+<span id="cb3-46"><a href="#cb3-46" aria-hidden="true"></a>h264_slice_header_parse</span>
+<span id="cb3-47"><a href="#cb3-47" aria-hidden="true"></a>Decode slice, frame_num = <span class="dv">15</span></span>
+<span id="cb3-48"><a href="#cb3-48" aria-hidden="true"></a></span>
+<span id="cb3-49"><a href="#cb3-49" aria-hidden="true"></a><span class="co">// (!) FrameNum 从12跳到15。引用帧丢失，FFmpeg 执行 Error concealment 逻辑。</span></span>
+<span id="cb3-50"><a href="#cb3-50" aria-hidden="true"></a>Frame num gap <span class="dv">15</span> <span class="dv">12</span></span>
+<span id="cb3-51"><a href="#cb3-51" aria-hidden="true"></a>mmco:<span class="dv">1</span> <span class="dv">8</span> <span class="dv">0</span></span>
+<span id="cb3-52"><a href="#cb3-52" aria-hidden="true"></a>mmco: unref <span class="dt">short</span> <span class="dv">8</span> count <span class="dv">4</span></span>
+<span id="cb3-53"><a href="#cb3-53" aria-hidden="true"></a>remove <span class="dt">short</span> <span class="dv">8</span> count <span class="dv">4</span></span>
+<span id="cb3-54"><a href="#cb3-54" aria-hidden="true"></a>fn <span class="dv">8</span> removed</span>
+<span id="cb3-55"><a href="#cb3-55" aria-hidden="true"></a><span class="dt">short</span> term list:</span>
+<span id="cb3-56"><a href="#cb3-56" aria-hidden="true"></a>    <span class="dv">0</span> fn:<span class="dv">12</span> poc:<span class="dv">65569</span> <span class="bn">0x1106e1000</span></span>
+<span id="cb3-57"><a href="#cb3-57" aria-hidden="true"></a>    <span class="dv">1</span> fn:<span class="dv">10</span> poc:<span class="dv">65563</span> <span class="bn">0x10fee3000</span></span>
+<span id="cb3-58"><a href="#cb3-58" aria-hidden="true"></a>    <span class="dv">2</span> fn:<span class="dv">9</span> poc:<span class="dv">65560</span> <span class="bn">0x10fae4000</span></span>
+<span id="cb3-59"><a href="#cb3-59" aria-hidden="true"></a><span class="co">// 加入了 FrameNum = 13 的帧。该帧事实上已经丢失，是通过复制第12帧得到的</span></span>
+<span id="cb3-60"><a href="#cb3-60" aria-hidden="true"></a><span class="dt">short</span> term list:</span>
+<span id="cb3-61"><a href="#cb3-61" aria-hidden="true"></a>    <span class="dv">0</span> fn:<span class="dv">13</span> poc:<span class="dv">0</span> <span class="bn">0x110ae0000</span></span>
+<span id="cb3-62"><a href="#cb3-62" aria-hidden="true"></a>    <span class="dv">1</span> fn:<span class="dv">12</span> poc:<span class="dv">65569</span> <span class="bn">0x1106e1000</span></span>
+<span id="cb3-63"><a href="#cb3-63" aria-hidden="true"></a>    <span class="dv">2</span> fn:<span class="dv">10</span> poc:<span class="dv">65563</span> <span class="bn">0x10fee3000</span></span>
+<span id="cb3-64"><a href="#cb3-64" aria-hidden="true"></a>    <span class="dv">3</span> fn:<span class="dv">9</span> poc:<span class="dv">65560</span> <span class="bn">0x10fae4000</span></span>
+<span id="cb3-65"><a href="#cb3-65" aria-hidden="true"></a><span class="co">// (!) FrameNum = 13，和15的差为2，说明还是有帧缺失</span></span>
+<span id="cb3-66"><a href="#cb3-66" aria-hidden="true"></a>Frame num gap <span class="dv">15</span> <span class="dv">13</span></span>
+<span id="cb3-67"><a href="#cb3-67" aria-hidden="true"></a>mmco:<span class="dv">1</span> <span class="dv">9</span> <span class="dv">0</span></span>
+<span id="cb3-68"><a href="#cb3-68" aria-hidden="true"></a>mmco: unref <span class="dt">short</span> <span class="dv">9</span> count <span class="dv">4</span></span>
+<span id="cb3-69"><a href="#cb3-69" aria-hidden="true"></a>remove <span class="dt">short</span> <span class="dv">9</span> count <span class="dv">4</span></span>
+<span id="cb3-70"><a href="#cb3-70" aria-hidden="true"></a>fn <span class="dv">9</span> removed</span>
+<span id="cb3-71"><a href="#cb3-71" aria-hidden="true"></a><span class="dt">short</span> term list:</span>
+<span id="cb3-72"><a href="#cb3-72" aria-hidden="true"></a>    <span class="dv">0</span> fn:<span class="dv">13</span> poc:<span class="dv">65571</span> <span class="bn">0x110ae0000</span></span>
+<span id="cb3-73"><a href="#cb3-73" aria-hidden="true"></a>    <span class="dv">1</span> fn:<span class="dv">12</span> poc:<span class="dv">65569</span> <span class="bn">0x1106e1000</span></span>
+<span id="cb3-74"><a href="#cb3-74" aria-hidden="true"></a>    <span class="dv">2</span> fn:<span class="dv">10</span> poc:<span class="dv">65563</span> <span class="bn">0x10fee3000</span></span>
+<span id="cb3-75"><a href="#cb3-75" aria-hidden="true"></a><span class="co">// 加入了 FrameNum = 14 的帧。该帧复制自第13（12）帧</span></span>
+<span id="cb3-76"><a href="#cb3-76" aria-hidden="true"></a><span class="dt">short</span> term list:</span>
+<span id="cb3-77"><a href="#cb3-77" aria-hidden="true"></a>    <span class="dv">0</span> fn:<span class="dv">14</span> poc:<span class="dv">0</span> <span class="bn">0x110f10000</span></span>
+<span id="cb3-78"><a href="#cb3-78" aria-hidden="true"></a>    <span class="dv">1</span> fn:<span class="dv">13</span> poc:<span class="dv">65571</span> <span class="bn">0x110ae0000</span></span>
+<span id="cb3-79"><a href="#cb3-79" aria-hidden="true"></a>    <span class="dv">2</span> fn:<span class="dv">12</span> poc:<span class="dv">65569</span> <span class="bn">0x1106e1000</span></span>
+<span id="cb3-80"><a href="#cb3-80" aria-hidden="true"></a>    <span class="dv">3</span> fn:<span class="dv">10</span> poc:<span class="dv">65563</span> <span class="bn">0x10fee3000</span></span>
+<span id="cb3-81"><a href="#cb3-81" aria-hidden="true"></a><span class="co">// 现在不再存在 Frame num gap，可以继续往下处理</span></span>
+<span id="cb3-82"><a href="#cb3-82" aria-hidden="true"></a>Set pic_field_poc[<span class="dv">0</span>] = <span class="dv">65573</span>, [<span class="dv">1</span>] = <span class="dv">65573</span></span>
+<span id="cb3-83"><a href="#cb3-83" aria-hidden="true"></a><span class="dt">short</span> term list:</span>
+<span id="cb3-84"><a href="#cb3-84" aria-hidden="true"></a>    <span class="dv">0</span> fn:<span class="dv">14</span> poc:<span class="dv">65573</span> <span class="bn">0x110f10000</span></span>
+<span id="cb3-85"><a href="#cb3-85" aria-hidden="true"></a>    <span class="dv">1</span> fn:<span class="dv">13</span> poc:<span class="dv">65571</span> <span class="bn">0x110ae0000</span>  <span class="co">// 这里打出的是 `short_ref` 中的 POC，不是 `ref_list` 中的 POC</span></span>
+<span id="cb3-86"><a href="#cb3-86" aria-hidden="true"></a>    <span class="dv">2</span> fn:<span class="dv">12</span> poc:<span class="dv">65569</span> <span class="bn">0x1106e1000</span></span>
+<span id="cb3-87"><a href="#cb3-87" aria-hidden="true"></a>    <span class="dv">3</span> fn:<span class="dv">10</span> poc:<span class="dv">65563</span> <span class="bn">0x10fee3000</span></span>
+<span id="cb3-88"><a href="#cb3-88" aria-hidden="true"></a><span class="co">// List0（List1）：向前（向后）参考图像列表。</span></span>
+<span id="cb3-89"><a href="#cb3-89" aria-hidden="true"></a>List0: ST fn:<span class="dv">14</span> <span class="bn">0x0</span><span class="er">x110f10000</span></span>
+<span id="cb3-90"><a href="#cb3-90" aria-hidden="true"></a>List1: ST fn:<span class="dv">13</span> <span class="bn">0x0</span><span class="er">x110ae0000</span></span>
+<span id="cb3-91"><a href="#cb3-91" aria-hidden="true"></a><span class="co">// (!) 报出错误：List1[0] (frame_num = 13) 并没有收到，POC 无效</span></span>
+<span id="cb3-92"><a href="#cb3-92" aria-hidden="true"></a>co located POCs unavailable</span>
+<span id="cb3-93"><a href="#cb3-93" aria-hidden="true"></a>    <span class="co">// `col_poc[0]` 和 `col_poc[1]` 是指顶场和底场，对帧编码来说二者相同</span></span>
+<span id="cb3-94"><a href="#cb3-94" aria-hidden="true"></a>    cur_poc = <span class="dv">65573</span>, col_poc[<span class="dv">0</span>] = <span class="dv">2147483647</span>, col_poc[<span class="dv">1</span>] = <span class="dv">2147483647</span>, ref_count[<span class="dv">1</span>] = <span class="dv">1</span></span>
+<span id="cb3-95"><a href="#cb3-95" aria-hidden="true"></a>    cur frame_num = <span class="dv">15</span>, col frame_num = <span class="dv">13</span></span></code></pre></div>
+<p>在直播 + 高码率 + 带宽有限的情况下丢帧是不可避免的。流媒体服务器可以去监测这个指标作为视频质量的一个度量。</p>
+<h2 id="代码对照">代码对照</h2>
+<p>“h264: co located POCs unavailable” 错误在 <a href="https://github.com/FFmpeg/FFmpeg/blob/n3.4.2/libavcodec/h264_direct.c#L156">h264_direct.c:ff_h264_direct_ref_list_init</a> 中打出，从代码上看，引起错误的条件是 <code>H264SliceContext.ref_list[1][0]</code> 对应的 <code>H264Picture</code> 的 <code>field_poc</code> 字段没有被赋值。</p>
+<p><code>field_poc</code> 在 <a href="https://github.com/FFmpeg/FFmpeg/blob/n3.4.2/libavcodec/h264_slice.c#L544">h264_slice.c:h264_frame_start</a> 中初始化为 <code>INT_MAX</code>。</p>
+<p>大致流程的伪代码描述：</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a>decode_nal_units():</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>    <span class="cf">if</span> nal_type ∈ {IDR, NON_IDR}:</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a>        ff_h264_queue_decode_slice():</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a>            <span class="cf">if</span> current_slice <span class="op">==</span> <span class="dv">0</span>:</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a>                h264_field_start():</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a>                    <span class="cf">while</span> frame_num_gap():</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a>                        <span class="co"># Print &quot;Frame num gap&quot;</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>                        h264_frame_start()</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>                        ff_h264_execute_ref_pic_marking():</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a>                            <span class="co"># Print short term list</span></span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a>                        av_image_copy()</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a>                        short_ref[<span class="dv">0</span>]<span class="op">-&gt;</span>poc <span class="op">=</span> prev<span class="op">-&gt;</span>poc <span class="op">+</span> <span class="dv">2</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a></span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a>                    h264_frame_start()</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a>                    ff_h264_init_poc():</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>                        <span class="co"># 设置 field_poc</span></span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true"></a></span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true"></a>            h264_slice_init():</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true"></a>                ff_h264_build_ref_list():</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true"></a>                    <span class="co"># Print short term list</span></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true"></a>                    h264_initialise_ref_list():</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true"></a>                        build_def_list()</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true"></a>                        <span class="co"># Print List0 List1</span></span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true"></a>                ff_h264_direct_ref_list_init()</span></code></pre></div>
+<p>Error Concealment 代码只设置了 <code>poc</code>，但没有设置 <code>field_poc</code>。 <a href="https://github.com/FFmpeg/FFmpeg/blob/n3.4.2/libavcodec/h264_slice.c#L1549">h264_slice.c:h264_field_start</a></p>
+<p>我试了一下加上 <code>field_poc</code> 的赋值，就不会报这个错误了：</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode diff"><code class="sourceCode diff"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a>                 h-&gt;short_ref[0]-&gt;poc = prev-&gt;poc + 2;</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a><span class="va">+                h-&gt;short_ref[0]-&gt;field_poc[0] = prev-&gt;field_poc[0] + 2;</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a><span class="va">+                h-&gt;short_ref[0]-&gt;field_poc[1] = prev-&gt;field_poc[1] + 2;</span></span></code></pre></div>
+<p>是否可以认为这是 FFmpeg 的一个 bug 呢？实际上并非如此。根据 H.264 规范，Error Concealment 逻辑可以由播放器自己灵活选择，从完全不恢复错误（每次丢包都打出 error log）到按 best effort 恢复任何丢失的包（这样用户看到的视频可能和原视频不符）都不算错。所以这种情况下既然已经发生了丢包，FFmpeg 打出错误日志也是合理的做法。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - AutoLISP Calculator</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>AutoLISP Calculator</h1>
+            <div class="info">
+    Posted on April  5, 2010
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>For engineers who need to do calculations frequently, a calculator program embedded in AutoCAD might be more convenient than a pocket electronic one. Although AutoCAD has already provided users with a handy tool - the “CAL” command for performing arithmetic, it is still imperfect considering its low precision and occasionally raised integer overflow errors. Therefore I wrote a lightweight calculator in AutoLISP as an alternative.</p>
+<p>Here is the code (only tested in AutoCAD 2004):</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode lisp"><code class="sourceCode commonlisp"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>(<span class="kw">defun</span><span class="fu"> C</span>:CLC ()</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>  (vl-load-com)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>  (<span class="kw">setq</span> calculator (vlax-get-acad-object))</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>  (while T</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>    (<span class="kw">setq</span> expr (getstring <span class="st">&quot;</span><span class="sc">\n</span><span class="st">Expression:= &quot;</span>))</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>    (<span class="kw">setq</span> expr (vl-string-translate <span class="st">&quot;*&quot;</span> <span class="st">&quot;_&quot;</span> expr))</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>    (while (<span class="kw">setq</span> <span class="kw">position</span> (vl-string-position (ascii <span class="st">&quot;_&quot;</span>) expr))</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>      (<span class="kw">setq</span> expr (vl-string-subst <span class="st">&quot;*1.*&quot;</span> <span class="st">&quot;_&quot;</span> expr <span class="kw">position</span>))</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>    )</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>    (vlax-invoke-method calculator 'Eval</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>      (strcat <span class="st">&quot;Pi=4*Atn(1):a=&quot;</span> <span class="st">&quot;.0+&quot;</span> expr <span class="st">&quot;:ThisDrawing.Utility.Prompt a&quot;</span>)</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>    )</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>  )</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>)</span></code></pre></div>
+<p>This program doesn’t try to interpret the expressions itself, instead it employs the VBA interpreter shipped with AutoCAD to do the job and then prints the results onto the command window directly. Part of the code is for the purpose of avoiding common integer overflows. In spite of the lack of particular functionalities like geometry (vectors, coordinates and distances) calculations, this piece of code has some advantages over the original cammand “CAL” (besides improved precision and less overflows): (1) It will keep running until the user presses the <kbd>ESC</kbd> key; (2) Can work in multiple-tab environment; (3) It stores the current result into a temporary variable <code>a</code> for later use. Another possible approach to this problem is write the entire program in VB: add the reference of “Microsoft Scripting Runtime” and you have the power of VBScript engine. Not only can it interpret mathematical expressions but it even brings you the ability to use Regular Expressions too - but, it won’t be as straightforward to implement as this AutoLISP calculator.</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

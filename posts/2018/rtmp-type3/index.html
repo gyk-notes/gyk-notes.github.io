@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - RTMP扩展时间戳编码问题</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>RTMP扩展时间戳编码问题</h1>
+            <div class="info">
+    Posted on November 24, 2018
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'AV'." href="../../../tags/AV.html">AV</a>
+    
+</div>
+
+<p>RTMP 虽然号称“开放协议”，但是据我所知 Adobe 并没有发布过任何正经标准，通常可供参考的官方资料是2012年 12月21日世界末日当天发布的 RTMP 1.0 备忘录。可以想象当时二逗逼的程序员顶着世界毁灭的巨大压力发布文档，结果忙中出错，其中许多含混不清之处没有修改，以至于给现在的开发人员造成了一些困扰。最近碰到的一个问题就与 RTMP Type 3 chunk 编码规范的歧义描述有关。</p>
+<p>主要症状：用 FFmpeg 或 libavformat 内核的播放器从我厂的 RTMP 服务器拉流，会因为 “RTMP packet size mismatch” 错误拉流失败。原因是厂里自制 RTMP 服务器的协议解析部分认为 Type 3 chunk message（在上一个 Type 0/1/2 chunk 使用了 extended timestamp 的情况下）不需要带 extended timestamp，但是 FFmpeg 却会对 Type 3 chunk 尝试解析 extended timestamp，偏移了4个字节导致后续解码都是错误的。这个问题在推流大约 4 个半小时后就会出现。如果把 FFmpeg <code>libavformat/rtmppkt.c</code>的<a href="https://github.com/FFmpeg/FFmpeg/blob/release/3.4/libavformat/rtmppkt.c#L228">这行</a>改成</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>    <span class="cf">if</span> (ts_field == <span class="bn">0xFFFFFF</span> &amp;&amp; hdr != RTMP_PS_ONEBYTE) {</span></code></pre></div>
+<p>就可以正确拉流。</p>
+<p>那么 Type 3 chunk message 究竟是否包含 extended timestamp？RTMP <del>规范</del>备忘录 5.3.1.3 Extended Timestamp 是这么写的：</p>
+<blockquote>
+<p>The presence of this field is indicated by setting the timestamp field of a Type 0 chunk, or the timestamp delta field of a Type 1 or 2 chunk, to 16777215 (0xFFFFFF). This field is present in Type 3 chunks <strong>when the most recent Type 0, 1, or 2 chunk for the same chunk stream ID indicated the presence of an extended timestamp field</strong>.</p>
+</blockquote>
+<p>这段话的表述读起来有点歧义。按我最初的理解，即使时间戳超过了 <code>0xFFFFFF</code>，Type 3 chunk message 也不应该包含（即隐式的“present”）这个字段。否则就感觉协议设计有点不合理（当然，RTMP 的设计本来就有许多不合理之处<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>），比如continuing Type 3 chunk（上一个 Type 0/1/2 chunk 的延续，两种 Type 3 chunk 之一）的extended ts 和之前 Type 0/1/2 的不一样，应该用哪个时间戳？同时实现代码也复杂化了。</p>
+<p>当法律（RTMP 标准）模棱两可的时候，只好去参考惯例（Flash/FMS/…）。考据了一下，看起来最早就是 Adobe 自己这么实现的，然后 FFmpeg 在 <a href="https://github.com/FFmpeg/FFmpeg/commit/5b2ad78f97d43299adcb038c04346999fe9b196c">这个提交</a> 中改成目前的做法。nginx-rtmp 在注释中有说明 Type 3 chunk 没有这个字段，但是为了兼容性也增加了<code>publish_time_fix</code> 配置：<a href="https://github.com/arut/nginx-rtmp-module/blob/v1.2.1/ngx_rtmp_handler.c#L408" class="uri">https://github.com/arut/nginx-rtmp-module/blob/v1.2.1/ngx_rtmp_handler.c#L408</a>。所以结论就是，应该参照 Adobe 官方的实现包含这个字段。</p>
+<p>在常见配置（不同类型的消息用不同的 MSID 和 CSID）下，这里引起解码错误的 Type 3 chunk + extended timestamp 这种情况其实很罕见，因为 Type 0 chunk 只在流的一开始出现，后面基本都是用相对时间戳。所以即使绝对时间戳超过 0xFFFFFF 再超过 <code>u32::max_value()</code> 然后回绕，timestamp (delta) 字段的值都可以很小，不需要用 extended ts。但是为什么在我们的拉流测试中却频繁出现？原来又有一个地方揣测错了 Adobe 的旨意，是关于 continuing Type 3 chunk 时间戳处理的（具体分析略）。因为这第二个 bug，Type 0 chunk 经常出现，于是才暴露了前面的兼容性问题。</p>
+<section class="footnotes" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1" role="doc-endnote"><p>Kundan Singh, “Problems in RTMP.”, <a href="http://blog.kundansingh.com/2009/06/problems-in-rtmp.html" class="uri">http://blog.kundansingh.com/2009/06/problems-in-rtmp.html</a>.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

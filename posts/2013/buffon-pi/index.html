@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 论投针的正确姿势</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>论投针的正确姿势</h1>
+            <div class="info">
+    Posted on April 24, 2013
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Probability'." href="../../../tags/Probability.html">Probability</a>, <a title="All pages tagged 'Haskell'." href="../../../tags/Haskell.html">Haskell</a>
+    
+</div>
+
+<h2 id="buffon投针实验">Buffon投针实验</h2>
+<p>将一根直径为 <em>l</em> 的针，投掷在画着间距为 <em>d</em> 的平行线族的地面上（ <em>l ≤ d</em> ，短针实验），可以求出针与直线相交的概率为<span class="math inline">\(\frac{2l}{\pi d}\)</span> <a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>。设 <em>p<sub>N</sub></em> 为N次实验中针与平行线相交的几率，可以得到π的估计值：</p>
+<p><span class="math display">\[
+\pi = \lim_{N \to \infty} \frac{2l}{p_Nd}
+\]</span></p>
+<p>现在我们要编程模拟Buffon’s needle，要求<strong>不</strong>使用π的值。（似乎我们只是要模拟真实世界投针实验的话，用上π并没有逻辑缺陷？关于这个问题，我只能说，这都是出题者的安排。）</p>
+<p>在Buffon投针实验中π估计值Standard Error的渐进值是<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a>：</p>
+<p><span class="math display">\[
+SE\ \widehat{\pi} \cong \pi \sqrt{\frac{\pi-2l/d}{2Nl/d}}
+\]</span></p>
+<p>取 <em>l = d</em> 可以使标准误差最小。以下的讨论均假设 <em>l = d</em> 。</p>
+<h2 id="算法分析">算法分析</h2>
+<p>因为题目规定不允许使用π，针与平行线的夹角只能间接生成。乍一看这是很trivial的问题，但是一拍脑袋想出的几个算法都有各自的缺点：</p>
+<ol type="1">
+<li><p>按[0, 1]均匀分布，生成两个随机数作为点的坐标，得到该点和原点连线的斜率。显然这样得到不同夹角的几率不同，角度并不均匀分布： <span class="math display">\[
+p(\theta) \propto \frac{1}{\cos(\frac{\pi}{4}-|\frac{\pi}{4}-\theta|)},
+\quad \theta\in[0,\frac{\pi}{2}]
+\]</span></p></li>
+<li><p>类似方法(1)，但是同时生成两个点，由两点的连线确定针的斜率。这样夹角也不是均布的： <span class="math display">\[
+\begin{aligned}
+pdf(x) &amp;= \mathbf{1}_{[0,1]} * \mathbf{1}_{[-1,0]} \\
+&amp;= (1-|x|)\mathbf{1}_{[-1,1]}(x) \\
+pdf(y) &amp;= (1-|y|)\mathbf{1}_{[-1,1]}(y) \\
+p(\theta) &amp;\propto \frac{1}{2} - \frac{\tan(\frac{\pi}{4}-|\frac{\pi}{4}-\theta|)}{6},
+\quad \theta\in [0,\frac{\pi}{2}]
+\end{aligned}
+\]</span></p></li>
+<li><p>类似方法(1)，但是如果该点到原点的距离大于1则舍去。这样做的问题在于：既然 <em>(没被舍去的点的数量×4)/点数</em> 也是π的一个估计，为什么不直接使用呢？由二项分布，可以求出基于面积的Monte Carlo法求π的Standard Error渐进值是： <span class="math display">\[
+SE\ \widehat{\pi}_{Area} \cong 4 \sqrt{\frac{\pi(1-\pi/4)}{4N}}
+\]</span> 而Buffon投针实验π估计值的Standard Error渐进值是： <span class="math display">\[
+SE\ \widehat{\pi}_{Buffon} \cong \pi \sqrt{\frac{\pi-2}{2N}}
+\]</span> 前者是后者的0.69倍，因此是更有效的估计值。如果认为“使用π的值去估算π”是不合理的，那么这种方法也不合理。</p></li>
+<li><p>取整数x∈<code>[INT_MIN, INT_MAX]</code>均匀分布，作为夹角的弧度值。然后点到平行线族的距离可以由<code>sin((double)x)</code>之类的办法计算出来。其实，这种方法也使用了预先定义的π值，因为不管是三角函数的硬件还是软件实现，都要先根据函数周期性把x约简到原点附近的一个区间内。具体见<a href="#fn3" class="footnote-ref" id="fnref3" role="doc-noteref"><sup>3</sup></a>和<a href="#fn4" class="footnote-ref" id="fnref4" role="doc-noteref"><sup>4</sup></a>。</p></li>
+</ol>
+<hr />
+<p>以下给出一个可以避免上述问题的算法：首先，Fibonacci随机数发生器的随机性可以满足投针实验的要求。另一方面，根据 <span class="math display">\[
+\begin{aligned}
+F_{n} &amp;= F_{n-1} + F_{n-2}\\
+\sin F_{n} &amp;= \sin F_{n-1} \cos F_{n-2} + \cos F_{n-1} \sin F_{n-2}\\
+\cos F_{n} &amp;= \cos F_{n-1} \cos F_{n-2} - \sin F_{n-1} \sin F_{n-2}
+\end{aligned}
+\]</span> 可以很容易由 <em>F<sub>n-1</sub></em> 和 <em>F<sub>n-2</sub></em> 的 sin/cos 值计算 sin(<em>F<sub>n</sub></em> Mod 2π) 。我们可以从两个数，比如0.5和1.5出发，生成Fibonacci随机序列对应的正弦值。</p>
+<p>这样计算会逐渐累积数值误差，但是只要用 <span class="math inline">\(\sqrt{\sin^2F_n + \cos^2F_n}\)</span> 正则化就可以把误差控制在可接受的范围内。</p>
+<h2 id="编程实现">编程实现</h2>
+<p>我用Haskell实现了上面的算法，在GHC v7.4.1上测试通过。这段程序先用<code>sinCosFib</code>生成一个包含<code>(sin(Fib n), cos(Fib n))</code> 对的列表。 <code>isCrossed</code>函数用于判断针是否和平行线相交。最后，<code>calcPiBuffon</code>根据相交的次数估算出π。</p>
+<p><strong>完整代码</strong>：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">import</span> <span class="dt">System.Random</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a><span class="ot">rangeSmall ::</span> (<span class="dt">Double</span>, <span class="dt">Double</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>rangeSmall <span class="ot">=</span> (small (<span class="op">-</span>), small (<span class="op">+</span>)) <span class="kw">where</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>  small <span class="ot">=</span> \op <span class="ot">-&gt;</span> (<span class="dv">1</span> <span class="ot">`op`</span>) <span class="op">.</span> <span class="fu">last</span> <span class="op">.</span> <span class="fu">takeWhile</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>    (\x <span class="ot">-&gt;</span> <span class="fu">sqrt</span>(<span class="dv">1</span> <span class="ot">`op`</span> x) <span class="op">/=</span> <span class="dv">1</span>) <span class="op">$</span> <span class="fu">iterate</span> (<span class="op">/</span><span class="dv">2</span>) <span class="dv">1</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a><span class="ot">randSineList ::</span> <span class="dt">Double</span> <span class="ot">-&gt;</span> [<span class="dt">Double</span>]</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>randSineList seed <span class="ot">=</span> <span class="fu">map</span> (<span class="fu">abs</span> <span class="op">.</span> <span class="fu">fst</span>) sinCosFib</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>  <span class="kw">where</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a><span class="ot">    sinCosFib ::</span> [(<span class="dt">Double</span>, <span class="dt">Double</span>)]</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>    sinCosFib <span class="ot">=</span> (<span class="fu">sin</span> fib1, <span class="fu">cos</span> fib1) <span class="op">:</span> (<span class="fu">sin</span> <span class="fl">1.5</span>, <span class="fu">cos</span> <span class="fl">1.5</span>) <span class="op">:</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>      <span class="fu">zipWith</span> next sinCosFib (<span class="fu">tail</span> sinCosFib)</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>        <span class="kw">where</span> fib1 <span class="ot">=</span> <span class="fl">0.75</span> <span class="op">+</span> <span class="fl">0.25</span> <span class="op">*</span> (seed <span class="op">-</span> <span class="fl">0.5</span>)</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a>    (lower, upper) <span class="ot">=</span> rangeSmall</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a>    next' (sa, ca) (sb, cb) <span class="ot">=</span> (sa <span class="op">*</span> cb <span class="op">+</span> ca <span class="op">*</span> sb, ca <span class="op">*</span> cb <span class="op">-</span> sa <span class="op">*</span> sb)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true"></a>    next sca scb <span class="ot">=</span> <span class="kw">let</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true"></a>      (s, c) <span class="ot">=</span> next' sca scb</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true"></a>      lenSquared <span class="ot">=</span> s <span class="op">*</span> s <span class="op">+</span> c <span class="op">*</span> c <span class="kw">in</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true"></a>        <span class="kw">if</span> lenSquared <span class="op">&gt;=</span> upper <span class="op">||</span> lenSquared <span class="op">&lt;=</span> lower</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true"></a>        <span class="kw">then</span> <span class="kw">let</span> scale <span class="ot">=</span> <span class="dv">1</span> <span class="op">/</span> <span class="fu">sqrt</span>(lenSquared) <span class="kw">in</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true"></a>          (s <span class="op">*</span> scale, c <span class="op">*</span> scale)</span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true"></a>        <span class="kw">else</span> (s, c)</span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true"></a></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true"></a><span class="ot">calcPiBuffon ::</span> <span class="dt">Int</span> <span class="ot">-&gt;</span> [(<span class="dt">Double</span>, <span class="dt">Double</span>)] <span class="ot">-&gt;</span> (<span class="dt">Int</span>, <span class="dt">Double</span>)</span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true"></a>calcPiBuffon nTosses distSinePairs <span class="ot">=</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true"></a>  (count, <span class="fu">fromIntegral</span> (nTosses <span class="op">*</span> <span class="dv">2</span>) <span class="op">/</span> <span class="fu">fromIntegral</span> count)</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true"></a>    <span class="kw">where</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true"></a>      count <span class="ot">=</span> <span class="fu">length</span> <span class="op">.</span> <span class="fu">filter</span> isCrossed <span class="op">.</span> <span class="fu">take</span> nTosses <span class="op">$</span> distSinePairs</span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true"></a>      isCrossed (distDoubled, sine) <span class="ot">=</span> sine <span class="op">&gt;</span> distDoubled</span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true"></a></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true"></a>main <span class="ot">=</span> <span class="kw">do</span></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true"></a>  r <span class="ot">&lt;-</span> randomIO</span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true"></a>  g <span class="ot">&lt;-</span> newStdGen</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true"></a>  <span class="kw">let</span> total <span class="ot">=</span> <span class="dv">10000</span></span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true"></a>  <span class="kw">let</span> (count, myPi) <span class="ot">=</span> calcPiBuffon total <span class="op">$</span></span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true"></a>        <span class="fu">zipWith</span> (,) (randoms g) (randSineList r)</span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true"></a></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true"></a>  <span class="fu">putStrLn</span> <span class="op">$</span> <span class="st">&quot;Total: &quot;</span> <span class="op">++</span> <span class="fu">show</span> total</span>
+<span id="cb1-41"><a href="#cb1-41" aria-hidden="true"></a>  <span class="fu">putStrLn</span> <span class="op">$</span> <span class="st">&quot;Count: &quot;</span> <span class="op">++</span> <span class="fu">show</span> count</span>
+<span id="cb1-42"><a href="#cb1-42" aria-hidden="true"></a>  <span class="fu">putStrLn</span> <span class="op">$</span> <span class="st">&quot;Estimated Pi = &quot;</span> <span class="op">++</span> <span class="fu">show</span> myPi</span></code></pre></div>
+<h2 id="实验结果">实验结果</h2>
+<p>在命令行用 <code>ghc Buffon.hs -O2 -optc-ffast-math</code> 编译生成可执行文件，取N = 10000进行投针实验，重复100次，结果如下：</p>
+<p><span class="math display">\[
+\begin{aligned}
+\bar{\widehat{\pi}}_{Exp} &amp;= 3.140390 \\
+SE\ \widehat{\pi}_{Exp} &amp;= 0.02215 \\
+\bar{\widehat{\pi}}_{Th} &amp;= 3.141593 \\
+SE\ \widehat{\pi}_{Th} &amp;= 0.02374 \\
+\end{aligned}
+\]</span></p>
+<p>实验结果与理论值吻合。</p>
+<section class="footnotes" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1" role="doc-endnote"><p>Dörrie, H. (1965). <em>100 Great Problems of Elementary Mathematics; Their History and Solution</em>, Dover Publications, New York,.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2" role="doc-endnote"><p>Mantel, N. (1953). <em>An Extension of the Buffon Needle Problem</em>, The Annals of Mathematical Statistics. <a href="http://www.jstor.org/stable/2236791?seq=2" class="uri">http://www.jstor.org/stable/2236791?seq=2</a><a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn3" role="doc-endnote"><p>CORDIC - Wikipedia. <a href="http://en.wikipedia.org/wiki/Cordic" class="uri">http://en.wikipedia.org/wiki/Cordic</a><a href="#fnref3" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn4" role="doc-endnote"><p>Git repository of glibc. <a href="http://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/ieee754/dbl-64/s_sin.c;hb=HEAD" class="uri">http://sourceware.org/git/?p=glibc.git;a=blob_plain;f=sysdeps/ieee754/dbl-64/s_sin.c;hb=HEAD</a><a href="#fnref4" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

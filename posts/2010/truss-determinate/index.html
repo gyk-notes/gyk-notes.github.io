@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 静定桁架之谜</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>静定桁架之谜</h1>
+            <div class="info">
+    Posted on August 10, 2010
+    
+</div>
+<div class="info">
+    
+    Tags: 
+    
+</div>
+
+<p>在Mathematica的文档里翻和<a href="http://en.wikipedia.org/wiki/Linear_programming">Linear Programming</a>相关的东西，找到一个很好玩的例子<a href="http://reference.wolfram.com/mathematica/tutorial/ConstrainedOptimizationLinearProgramming.html#326994842">Design of an Optimal Anchor</a>。简单的说，就是用线性规划来优化设计一侧锚固在墙上，另一侧受向下集中荷载的悬臂桁架。初始桁架由网格点阵中曼哈顿距离小于等于3的节点彼此连接而成，程序根据静力平衡条件对所有可能的各杆件内力组合以 Minimize ∑|force·length| 作优化（注：不考虑压杆稳定），然后移除内力微小的杆件，剩下的骨架就是锚件的最优化形式。详细步骤参考Mathematica文档上的说明。</p>
+<p>乍一看，这种优化方法从结构力学的角度考虑是讲不通的。因为例子中的初始桁架属于超静定结构，从静力平衡方程来说，未知数的个数多于约束方程组个数，因此存在多组可行解。通常在结构力学中，必须加上变形协调条件以确定究竟哪一组解才是合理的。举一个简单的例子，把两根相同（长度l，截面积A，弹性模量E都相同）的水平杆通过铰节点连接，整体两端与墙铰接，在中间铰节点处施加一个向右的1kN水平力，那么Fl=100kN，Fr=99kN（均为受拉）也满足静力平衡方程 -Fl+Fr+1=0，但在真实世界中是不会出现这种情况的。只需加入变形协调条件的约束就可以知道，两根杆有大小相同、反向相反的形变Δ（即中间铰接点的位移），因此Fl和Fr必须符号相反，大小都等于 EA/l·Δ。</p>
+<p>从另一个角度说，对于给定的超静定桁架，按文档里的方法依据 Minimize ∑|force·length| 求出杆件内力的“最优解”以后，把各根杆件的截面积取为正比于杆件内力的值，此时任何一根杆的线刚度 i = EA/l 已经确定，所以整体桁架的内力可以通过矩阵位移法求出，但是如此求得的内力却不大可能会和刚才假想的“最优解”一致。那么二者什么时候会一致呢？显然唯一能使等式成立的条件是：这个超静定桁架恰好被优化成了静定的。</p>
+<p>下面就来分析Optimal Anchor中的超静定桁架如何被优化成静定桁架。</p>
+<p>首先，程序中为什么要用 <code>comps</code> 和 <code>tensions</code> 两个非负List分别表示杆件的压力和拉力，而不是按照结构力学的惯例用正负号区分轴力的方向呢？这是因为这里非常规的使用了<strong>线性</strong>规划来求解，顾名思义，目标函数也必须是线性的。使用两个非负List可以避免引入绝对值运算，可直接调用现成的函数接口。</p>
+<p>Mathematica中<code>LinearProgramming</code>用法的一个简单示例：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode mathematica"><code class="sourceCode mathematica"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>(* vars: 方程的未知数List *)</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>vars = <span class="fu">Union</span>[<span class="fu">Flatten</span>[{comps, tensions}]];</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>(* const3: 约束方程组(节点的静力平衡条件)，用CoefficientArrays获取方程的常数项向量和未知数系数矩阵 *)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>{rhs, ma} = <span class="fu">CoefficientArrays</span>[const3, vars];</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>(* 目标函数向量 *)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>obj = <span class="fu">CoefficientArrays</span>[volume, vars][[<span class="dv">2</span>]];</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>{<span class="fu">m</span>, <span class="fu">n</span>} = <span class="fu">Dimensions</span>[ma];</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>sol = <span class="fu">LinearProgramming</span>[obj, ma, <span class="fu">Transpose</span>[{-rhs,<span class="fu">Table</span>[<span class="dv">0</span>, {<span class="fu">m</span>}]}], <span class="fu">Table</span>[{<span class="dv">0</span>, <span class="fu">Infinity</span>}, {<span class="fu">n</span>}]];</span></code></pre></div>
+<p>注意，<code>LinearProgramming</code>函数根据问题规模自动在较快的InteriorPoint和速度慢但是更精确的(Revised)Simplex方法中选择，所以会出现当矩阵的维数达到一定阈值后计算时间反而减少的现象。</p>
+<p>那么，最小化∑|force·length|一定会把桁架优化为静定的吗(这样可行解就一定在力学上合理)？答案是肯定的。一种直观的理解是，超静定桁架不如它的最优静定子结构（也就是 ∑|force·length| 最小）的传力路径简捷。可以把一个超静定桁架看作它的最优静定子结构与其它静定子结构的合成，根据叠加原理，最优静定子结构将会优于超静定结构。</p>
+<p>我们知道，给定一种材料，其弹性模量E和容许应力[σ]为恒定值，在这种情况下 ∑A·L 最小时结构的材料也最省，对于静定结构，可令A<sub>i</sub>=|F<sub>i</sub>|/[σ]，所以最小化 ∑|force·length| 就可以得到最优化的结构；对于超静定结构来说，杆件内力和各杆件间的刚度比密切相关，因此对于一组给定的杆件内力，必须满足最小截面A<sub>i,min</sub>≥|F<sub>i</sub>|/[σ]，而其他截面A<sub>j</sub>&gt;|F<sub>i</sub>|/[σ]，所以 ∑A·L 将比根据 ∑|force·length| 计算出的结果大。</p>
+<p>来看一个例子：</p>
+<p><img src="Indeterminate.PNG" /></p>
+<p>来试算一下上图所示的超静定桁架：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode mathematica"><code class="sourceCode mathematica"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="fu">In</span>[<span class="dv">1</span>]:= ma = { {-(<span class="dv">1</span>/<span class="fu">Sqrt</span>[<span class="dv">2</span>]), <span class="dv">1</span>/<span class="fu">Sqrt</span>[<span class="dv">2</span>], <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">1</span>},</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>	{-(<span class="dv">1</span>/<span class="fu">Sqrt</span>[<span class="dv">2</span>]), -(<span class="dv">1</span>/<span class="fu">Sqrt</span>[<span class="dv">2</span>]), <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>},</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>	{<span class="dv">0</span>, <span class="dv">0</span>, -(<span class="dv">1</span>/<span class="fu">Sqrt</span>[<span class="dv">2</span>]), <span class="dv">1</span>/<span class="fu">Sqrt</span>[<span class="dv">2</span>], <span class="dv">-1</span>},</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>	{<span class="dv">0</span>, <span class="dv">0</span>, -(<span class="dv">1</span>/<span class="fu">Sqrt</span>[<span class="dv">2</span>]), -(<span class="dv">1</span>/<span class="fu">Sqrt</span>[<span class="dv">2</span>]), <span class="dv">0</span>} };</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a><span class="fu">In</span>[<span class="dv">2</span>]:= rhs = {-<span class="dv">10</span>, <span class="dv">0</span>, <span class="dv">0</span>, <span class="dv">0</span>};</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a><span class="fu">In</span>[<span class="dv">3</span>]:= vars = <span class="fu">x</span>[#] &amp; /@ <span class="fu">Range</span>[<span class="fu">Dimensions</span>[ma][[<span class="dv">2</span>]]];</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a><span class="fu">In</span>[<span class="dv">4</span>]:= obj = {<span class="fu">Sqrt</span>[<span class="dv">2</span>], <span class="fu">Sqrt</span>[<span class="dv">2</span>], <span class="fu">Sqrt</span>[<span class="dv">2</span>], <span class="fu">Sqrt</span>[<span class="dv">2</span>], <span class="dv">1</span>};</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a><span class="fu">In</span>[<span class="dv">5</span>]:= sol = <span class="fu">Solve</span>[ma . vars == rhs, vars][[<span class="dv">1</span>]]</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>During evaluation of <span class="fu">In</span>[<span class="dv">5</span>]:= <span class="fu">Solve</span>::svars: Equations may <span class="fu">not</span> give solutions <span class="fu">for</span> <span class="fu">all</span> &quot;solve&quot; <span class="fu">variables</span>. &gt;&gt;</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a><span class="fu">Out</span>[<span class="dv">5</span>]= {<span class="fu">x</span>[<span class="dv">5</span>] -&gt; <span class="fu">Sqrt</span>[<span class="dv">2</span>] <span class="fu">x</span>[<span class="dv">4</span>], <span class="fu">x</span>[<span class="dv">1</span>] -&gt; <span class="dv">5</span> <span class="fu">Sqrt</span>[<span class="dv">2</span>] + <span class="fu">x</span>[<span class="dv">4</span>],</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a> <span class="fu">x</span>[<span class="dv">2</span>] -&gt; <span class="dv">-5</span> <span class="fu">Sqrt</span>[<span class="dv">2</span>] - <span class="fu">x</span>[<span class="dv">4</span>], <span class="fu">x</span>[<span class="dv">3</span>] -&gt; -x[<span class="dv">4</span>]}</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a><span class="fu">In</span>[<span class="dv">6</span>]:= solution = vars /. sol</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true"></a><span class="fu">Out</span>[<span class="dv">6</span>]= {<span class="dv">5</span> <span class="fu">Sqrt</span>[<span class="dv">2</span>] + <span class="fu">x</span>[<span class="dv">4</span>], <span class="dv">-5</span> <span class="fu">Sqrt</span>[<span class="dv">2</span>] - <span class="fu">x</span>[<span class="dv">4</span>], -x[<span class="dv">4</span>], <span class="fu">x</span>[<span class="dv">4</span>],</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true"></a> <span class="fu">Sqrt</span>[<span class="dv">2</span>] <span class="fu">x</span>[<span class="dv">4</span>]}</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true"></a></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true"></a><span class="fu">In</span>[<span class="dv">7</span>]:= ToBeMinimized = <span class="fu">Plus</span> @@ ( <span class="fu">Apply</span>[<span class="fu">Abs</span>[#<span class="dv">1</span>*#<span class="dv">2</span>] &amp;, #] &amp; /@ <span class="fu">Transpose</span>[{ solution, obj}] )</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true"></a><span class="fu">Out</span>[<span class="dv">7</span>]= <span class="fu">Sqrt</span>[<span class="dv">2</span>] <span class="fu">Abs</span>[-<span class="dv">5</span> <span class="fu">Sqrt</span>[<span class="dv">2</span>] - <span class="fu">x</span>[<span class="dv">4</span>]] + <span class="dv">3</span> <span class="fu">Sqrt</span>[<span class="dv">2</span>] <span class="fu">Abs</span>[<span class="fu">x</span>[<span class="dv">4</span>]] + <span class="fu">Sqrt</span>[<span class="dv">2</span>] <span class="fu">Abs</span>[<span class="dv">5</span> <span class="fu">Sqrt</span>[<span class="dv">2</span>] + <span class="fu">x</span>[<span class="dv">4</span>]]</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true"></a></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true"></a><span class="fu">In</span>[<span class="dv">8</span>]:= <span class="fu">Minimize</span>[ToBeMinimized, vars]</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true"></a><span class="fu">Out</span>[<span class="dv">8</span>]= {<span class="dv">20</span>, {<span class="fu">x</span>[<span class="dv">1</span>] -&gt; <span class="dv">0</span>, <span class="fu">x</span>[<span class="dv">2</span>] -&gt; <span class="dv">0</span>, <span class="fu">x</span>[<span class="dv">3</span>] -&gt; <span class="dv">0</span>, <span class="fu">x</span>[<span class="dv">4</span>] -&gt; <span class="dv">0</span>, <span class="fu">x</span>[<span class="dv">5</span>] -&gt; <span class="dv">0</span>}}</span></code></pre></div>
+<p><code>x[4]</code>的值取为0，所以这个桁架被优化成了静定结构。</p>
+<p>对于Mathematica中的例子，请看下面这张原程序在10×10网格上优化结果的实例图，毫无疑问这就是一个典型的静定桁架。</p>
+<p><img src="LinearPrg10X10.svg" alt="Truss10x10" width="262" height="286"> <!-- ![Truss10x10](LinearPrg10X10.svg) --></p>
+<p>上面啰哩八嗦写了这么多，感觉还是没有表达清楚推导过程。我猜测这个问题从矩阵的角度来看会有很简洁的表述，就像用刚度矩阵的秩来判断结构的常变、瞬变、静定、超静定一样。关于这一点，还有待今后进一步研究。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

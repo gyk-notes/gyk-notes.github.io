@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - Minimal FFmpeg Build for RTMP Streaming</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>Minimal FFmpeg Build for RTMP Streaming</h1>
+            <div class="info">
+    Posted on November  9, 2018
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>This tutorial will work you through steps of configuring an FFmpeg build tailored for RTMP streaming. The instructions given here are specific for macOS, but are trival to modify for use on other Unix-like systems.</p>
+<h2 id="goal">Goal</h2>
+<p>The built FFmpeg executable should</p>
+<ul>
+<li>Be able to pull/push RTMP streams, either by forwarding the stream from any <code>rtmp://</code> address or serving local media files.</li>
+<li>Be capable of extracting metadata from A/V packets, e.g., parsing the SPS/PPS of H.264 header, but the encoding/decoding parts are not included (that is, it will always use <code>-vcodec copy</code>). Supported codecs: H.264 for video, AAC/MP3 for audio.</li>
+<li>Be able to transmux among common container formats (FLV, MP4, MPEG-2 TS).</li>
+<li>Optimized for binary size.</li>
+</ul>
+<p>Strictly speaking it’s not really a “minimal” build for RTMP, it’s just small enough without losing the core functionality. I will use ripgrep (<code>rg</code>) throughout the tutorial, but grep also works.</p>
+<h2 id="steps">Steps</h2>
+<h3 id="list-options-marked-as-autodetect-and-disable-them">List options marked as “[autodetect]” and disable them</h3>
+<div class="sourceCode" id="cb1"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="bu">cd</span> <span class="va">$FFMPEG</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="ex">./configure</span> -h <span class="kw">\</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>    <span class="kw">|</span> <span class="ex">rg</span> <span class="st">'\[autodetect\]'</span> <span class="kw">\</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>    <span class="kw">|</span> <span class="ex">rg</span> -o -e <span class="st">'--[^ ]+'</span> <span class="kw">\</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>    <span class="kw">|</span> <span class="ex">rg</span> -e <span class="st">'--(enable|disable)'</span> -r <span class="st">'--disable'</span></span></code></pre></div>
+<p>which outputs:</p>
+<pre class="plain"><code>--disable-pthreads
+--disable-w32threads
+--disable-os2threads
+--disable-alsa
+--disable-appkit
+--disable-avfoundation
+--disable-bzlib
+--disable-coreimage
+--disable-iconv
+--disable-libxcb
+--disable-libxcb-shm
+--disable-libxcb-xfixes
+--disable-libxcb-shape
+--disable-lzma
+--disable-sndio
+--disable-sdl2
+--disable-xlib
+--disable-zlib
+--disable-amf
+--disable-audiotoolbox
+--disable-cuda
+--disable-cuvid
+--disable-d3d11va
+--disable-dxva2
+--disable-nvdec
+--disable-nvenc
+--disable-v4l2-m2m
+--disable-vaapi
+--disable-vdpau
+--disable-videotoolbox</code></pre>
+<p>Join these lines and we obtain <code>DISABLE_AUTODETECT_LIST</code>.</p>
+<h3 id="list-everything">List “everything”</h3>
+<p>Here “everything” refers to all available small components (demuxers, decoders, parsers, …) that we can turn on and off when building FFmpeg.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="ex">./configure</span> -h <span class="kw">|</span> <span class="ex">rg</span> -e <span class="st">'--list-'</span></span></code></pre></div>
+<p>The command above generates a meta list of <code>--list-*</code>s, each of which can be passed to <code>configure</code> to query all available components in a specific subcategory. If we simply pass <code>--disable-everything</code>, all the components from the big meta list will be disabled.</p>
+<p>Based on our use case, we obtain the “everything” list as</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="va">EVERYTHING_LIST=</span><span class="st">&quot;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a><span class="st">    --disable-everything \</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a><span class="st">    --enable-decoder=h264,aac,mp3 \</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a><span class="st">    --enable-encoder=aac,libmp3lame \</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a><span class="st">    --enable-parser=h264,aac,mp3 \</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a><span class="st">    --enable-demuxer=flv,mov,mpegts,h264,aac,mp3,live_flv \</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a><span class="st">    --enable-muxer=flv,mov,mpegts \</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a><span class="st">    --enable-protocol=file,rtmp,pipe,hls \</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a><span class="st">    --enable-bsf=aac_adtstoasc,h264_mp4toannexb&quot;</span></span></code></pre></div>
+<p>The bitstream filter <a href="https://ffmpeg.org/ffmpeg-bitstream-filters.html#aac_005fadtstoasc"><code>aac_adtstoasc</code></a> is necessary for transmuxing AAC audio in ADTS format (for MPEG-2 TS) into RTMP audio packet, so is <a href="https://ffmpeg.org/ffmpeg-bitstream-filters.html#h264_005fmp4toannexb"><code>h264_mp4toannexb</code></a> for transmuxing H.264 video in AvcC (for RTMP/FLV, MP4, etc.) into Annex. B format (for MPEG-2 TS).</p>
+<p>FFmpeg can either use its built-in RTMP implementation (see the <code>libavformat/rtmp.*.(h|c)</code> source files) or depend on <code>RTMPDump</code>’s <code>librtmp</code> via <code>libavformat/librtmp.c</code>. The latter has more complete protocol support (e.g. RTMPE, RTMPS, etc). You can optionally pass <code>--enable-librtmp</code> to switch to external RTMP dependency.</p>
+<h3 id="the-final-command">The final command</h3>
+<div class="sourceCode" id="cb5"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="fu">mkdir</span> build</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a><span class="bu">cd</span> build</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a><span class="ex">../configure</span> <span class="kw">\</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a>    <span class="va">${DISABLE_AUTODETECT_LIST}</span> <span class="kw">\</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a>    <span class="va">${EVERYTHING_LIST}</span> <span class="kw">\</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true"></a>    <span class="ex">--disable-avdevice</span> --disable-swscale --disable-postproc --disable-doc <span class="kw">\</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a>    <span class="ex">--disable-runtime-cpudetect</span> <span class="kw">\</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a>    <span class="ex">--enable-pthreads</span> --enable-gpl --enable-version3 <span class="kw">\</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true"></a>    <span class="ex">--enable-avcodec</span> --enable-avformat --enable-swresample --enable-avfilter <span class="kw">\</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true"></a>    <span class="ex">--disable-programs</span> --enable-ffmpeg --enable-small</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true"></a><span class="fu">make</span> -j4</span></code></pre></div>
+<p>(FIXME: Do we need <code>--enable-swresample</code>? Probably not.)</p>
+<p>Sample output:</p>
+<pre class="plain"><code>install prefix            /usr/local
+C compiler                gcc
+C library
+ARCH                      x86 (generic)
+big-endian                no
+runtime cpu detection     no
+standalone assembly       yes
+x86 assembler             yasm
+MMX enabled               yes
+MMXEXT enabled            yes
+3DNow! enabled            yes
+3DNow! extended enabled   yes
+SSE enabled               yes
+SSSE3 enabled             yes
+AESNI enabled             yes
+AVX enabled               yes
+AVX2 enabled              yes
+AVX-512 enabled           yes
+XOP enabled               yes
+FMA3 enabled              yes
+FMA4 enabled              yes
+i686 features enabled     yes
+CMOV is fast              yes
+EBX available             yes
+EBP available             yes
+debug symbols             yes
+strip symbols             yes
+optimize for size         yes
+optimizations             yes
+static                    yes
+shared                    no
+postprocessing support    no
+network support           yes
+threading support         pthreads
+safe bitstream reader     yes
+texi2html enabled         no
+perl enabled              yes
+pod2man enabled           yes
+makeinfo enabled          yes
+makeinfo supports HTML    no
+
+External libraries:
+librtmp        securetransport
+
+External libraries providing hardware acceleration:
+
+Libraries:
+avcodec        avfilter         avformat       avutil         swresample
+
+Programs:
+ffmpeg
+
+Enabled decoders:
+aac        h264           mp3
+
+Enabled encoders:
+aac
+
+Enabled hwaccels:
+
+Enabled parsers:
+aac        h264           mpegaudio
+
+Enabled demuxers:
+aac        h264           mov      mpegts
+flv        live_flv         mp3
+
+Enabled muxers:
+adts         flv            latm       mov          mpegts
+
+Enabled protocols:
+file         hls            rtmp      pipe
+
+Enabled filters:
+aformat        anull          atrim      format         null           trim
+
+Enabled bsfs:
+aac_adtstoasc      null      h264_mp4toannexb
+
+Enabled indevs:
+
+Enabled outdevs:
+</code></pre>
+<p>The built <code>ffmpeg</code> executable is less than 2.5MB, with the following shared library dependencies:</p>
+<pre class="plain"><code>$ otool -L ./ffmpeg
+./ffmpeg:
+	/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1252.0.0)
+	/System/Library/Frameworks/CoreFoundation.framework/Versions/A/CoreFoundation (compatibility version 150.0.0, current version 1445.12.0)
+	/System/Library/Frameworks/CoreVideo.framework/Versions/A/CoreVideo (compatibility version 1.2.0, current version 1.5.0)
+	/System/Library/Frameworks/CoreMedia.framework/Versions/A/CoreMedia (compatibility version 1.0.0, current version 1.0.0)</code></pre>
+<h3 id="troubleshooting">Troubleshooting</h3>
+<ul>
+<li><p>“nasm/yasm not found or too old.”</p>
+<p>Easy, just <code>brew install yasm</code>.</p></li>
+<li><p>“ERROR: librtmp not found using pkg-config”</p>
+<p>This happens only if <code>--enable-librtmp</code> is passed. By checking <code>./ffbuild/config.log</code> you will find it is <code>libssl</code> that is missing. It is actually a macOS High Sierra issue, and can be fixed by <code>export</code>ing <code>PKG_CONFIG_PATH=/usr/local/opt/openssl/lib/pkgconfig</code>.</p></li>
+</ul>
+<h2 id="references">References</h2>
+<ul>
+<li>Build your own tiny FFMPEG (<a href="https://github.com/alberthdev/alberthdev-misc/wiki/Build-your-own-tiny-FFMPEG" class="uri">https://github.com/alberthdev/alberthdev-misc/wiki/Build-your-own-tiny-FFMPEG</a>)</li>
+<li><a href="https://stackoverflow.com/questions/48973461/best-config-for-ffmpeg-to-convert-mp3-file-only" class="uri">https://stackoverflow.com/questions/48973461/best-config-for-ffmpeg-to-convert-mp3-file-only</a></li>
+</ul>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 物理引擎与CAE</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>物理引擎与CAE</h1>
+            <div class="info">
+    Posted on October  6, 2011
+    
+</div>
+<div class="info">
+    
+    Tags: 
+    
+</div>
+
+<p>最近在网上看到一句话：“你手机的计算能力，已经超越了NASA 1969年拥有的计算能力的总和。 NASA用那些计算能力发射人上了月球，而你用更强的计算能力发射愤怒的小鸟去砸猪。” 这个段子除了让人在下次玩愤怒的小鸟时多一点敬畏之心或者负罪感外，也让我不禁想到，计算能力的提升让掌上的“火箭科学”成为了可能，那么未来的结构工程力学分析软件又会是什么样的呢？</p>
+<p>大学的时候玩过一个造桥小游戏<a href="http://www.bridgebuilder-game.com/bb-info.php">Bridge Builder</a>，目标是以最节省的材料建造桥，计算机模拟跑过火车不被压垮就算成功。后来的Pontifex系列，增加了悬索之类的道具，游戏真实性又进了一步。后面我还看了游戏网站对制作者的采访，当问到具体算法时，被两位作者以“top secret”搪塞了过去，但我猜测底层用的就是一个通常的物理引擎。</p>
+<p>还有一个叫做<a href="http://www.arch.virginia.edu/arcade/">Arcade</a>的结构工程教学软件，由弗吉尼亚大学建筑学院教授Kirk Martini开发，把游戏物理引擎应用到了结构工程的分析中。网站上介绍这种方法有以下几个特点：</p>
+<ol type="1">
+<li>只形成单元刚度矩阵，不形成整体刚度矩阵。所以有处理大变形、大位移等非线性问题的潜力。</li>
+<li>为了达到可接受的精度，迭代的步长必须取的很小，次数必须很多，所以耗时较长，目前只能用于小型结构。这种算法数值稳定性较差，这也需要通过减小步长来改善。</li>
+<li>在结构振动方面，可以用于时程分析，不能用于模态分析。</li>
+</ol>
+<p>(1)是优点，(3)是缺点，从长远来看(2)可以得到解决。将来基于物理引擎的结构分析也许会走向实用。</p>
+<p>实际上，物理引擎使用的迭代法更接近真实世界里构件的受力反应。各个构件单元并没有智能，也不知道自己是整体结构的一部分。它们只是响应局部的受力平衡，在“看不见的手”的作用下，和其他单元协作达到稳态。</p>
+<p>当然，应用于计算机游戏产业的物理引擎和计算机辅助工程（CAE）的目标不同，前者是为了取悦观众的眼球，后者则要对安全性负责。但是，目前这两个学科的侧重点不同仅仅是计算能力有限环境下的一种妥协。与物理世界的一致性是共同的终极目标。计算力极大发展以后，二者的界限将逐渐淡化。</p>
+<p>有一种悲观主义观点认为硬件性能增长的好处将因为软件变得臃肿缓慢而抵消，就像Wirth法则（Wirth’s law: Software is getting slower more rapidly than hardware becomes faster）阐述的那样。但是结构分析软件显然不受此影响。原因一是如前面所说，以计算机硬件性能的飞速发展为参照，建筑规模的增长幅度近乎为零。二是建筑力学分析的精度要求永远不会高到哪里去，建材品控的不一致，施工放样的误差决定了软件单方面的精细分析没有意义。既然需求并不提高，软件（结构分析的核心模块）复杂度又怎么会与日俱增？</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

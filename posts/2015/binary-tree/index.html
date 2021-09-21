@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 美团网技术实力令贝尔实验室汗颜</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>美团网技术实力令贝尔实验室汗颜</h1>
+            <div class="info">
+    Posted on December 22, 2015
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>2014年我参加了美团网的校招。面试官让我在纸上写一下二叉树的后序遍历迭代法实现。我的算法和数据结构是当初考研的时候按 Robert Sedgewick 的《算法：C语言实现》学的，书上只有树的前序迭代遍历，这道题超纲了，从来没见过。于是我在现场只写了一行 <code>#include &lt;iostream&gt;</code> 就呆若木鸡楞在那里，然后就听到面试官说“今天就面到这儿吧。”</p>
+<p>最近比较有空，终于可以挑战一下这道题目了，也算了却一个心结。贴一下代码：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">template</span> &lt;<span class="kw">typename</span> T&gt;</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="dt">void</span> Tree&lt;T&gt;::postOrder(<span class="bu">std::</span>function&lt;<span class="dt">void</span> (T&amp; val)&gt; visitor)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>{</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>    TreeNode&lt;T&gt;* node = <span class="kw">this</span>-&gt;root;</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>    <span class="bu">std::</span>stack&lt;TreeNode&lt;T&gt;*&gt; s;</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>    <span class="cf">for</span> (;;) {</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>        <span class="cf">while</span> (node) {</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>            s.push(node);</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>            node = node-&gt;left;</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>        }</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>        <span class="cf">goto</span> EMPTY_CHECK;</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>        <span class="cf">while</span> (s.top()-&gt;right == node) {</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>            node = s.top();</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a>            s.pop();</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a>            visitor(node-&gt;value);</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a>    EMPTY_CHECK:</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true"></a>            <span class="cf">if</span> (s.empty()) <span class="cf">return</span>;</span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true"></a>        }</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true"></a>        node = s.top()-&gt;right;</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true"></a>    }</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true"></a>}</span></code></pre></div>
+<p>这段代码简直可以排进我迄今为止写过的最烧脑代码前三了。而且还不得不用了上 goto 语句，真是愧对 Dijkstra 他老人家。原谅我，我已经尽力了。</p>
+<p>直到今天我才发现自己对美团网的技术实力一无所知：这是一个人人都可以手写二叉树迭代后序遍历的团购网站。</p>
+<p>当时参加美团笔试另一个给我留下深刻印象的地方是， “美团网uses binary search the way Microsoft uses the if statement”。考卷中至少有三道题需要手写二分查找，进行到一半还有个考官专门进来说手写二分查找就是考点之一，如果调用系统函数 <code>bsearch</code> 会被扣分！ Jon Bentley 在《编程珠玑》中有提到，贝尔实验室90%的程序员无法在几个小时的宽裕时间内正确写出二分查找：</p>
+<blockquote>
+<p>那些专业的程序员有几个小时的时间，可以用他们选择的语言把上面的描述写出来；写出高级伪代码也可以。考试结束后，差不多所有程序员都认为自己写出了正确的程序。于是，我们花了半个钟头来看他们编写的代码经过测试用例验证的结果。几次课，一百多人的结果相差无几：90%的程序员写的程序中有bug。</p>
+</blockquote>
+<p>让人大跌眼镜的是，Jon Bentley 自己在书中给出的代码也被发现有bug（没记错的话他应该是用了存在溢出可能的 <code>(l + r) / 2</code> 求中点）。相比之下，美团网期待的员工可以面不改色的在一小时内手写三遍二分查找，而且这仅仅算一个额外的考点。所以我们可以负责任的说，99%的贝尔实验室员工，包括Jon Bentley本人都不能通过美团网的笔试选拔。在此我谨提出一个程序员招聘的“Jon Bentley标准”，即：如果一家IT公司的面试题不能成功筛选掉Jon Bentley，那么该公司就无法成为一个优秀的团购网站。</p>
+<p>诚然贝尔实验室发明了晶体管、二极管、C/C++语言、Unix，为人类文明做出了一定的贡献，但是论技术实力，还是要逊色于美团网三分。 21世纪是信息技术的时代，中华民族的伟大复兴任重道远，我们需要技术过硬的互联网公司为国家在国际社会赢得尊重。美团网在手写二分查找和二叉树后序遍历这两个项目上战胜了美国的老牌实验室。作为一个中国人，我为美团网感到由衷的自豪！</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 解释Well-typed Interpreter</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>解释Well-typed Interpreter</h1>
+            <div class="info">
+    Posted on March 13, 2021
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'code'." href="../../../tags/code.html">code</a>
+    
+</div>
+
+<p>Idris 的官方教程《A Crash Course in Idris 2》中有一个很有趣的示例： <a href="https://idris2.readthedocs.io/en/latest/tutorial/interp.html">The Well-Typed Interpreter</a>，用 Idris 写一个简单的函数式语言解释器。但是对于 dependent type 新手来说，这些代码刚读起来真是让人一头雾水。在看过 n 遍又看了第 <code>S n</code> 遍之后我终于搞懂了其中的奥妙。在这里记下笔记，供其他 Idris/DT 初学者参考。</p>
+<p>要理解这个解释器，以及它如何做到 well-typed，需要了解几个前序知识：</p>
+<ol type="1">
+<li>First-class type。学习函数式编程的时候会介绍的一个概念：函数和其他的值一样是“一等公民”，可以作为参数传入，或者返回值传出，即所谓的高阶函数。同理，在 DT 中类型也是一等公民，可以参与计算，也可以依赖其他的 <em>值</em>（而不仅仅是其他的类型），得到“高阶”类型。</li>
+<li>Curry–Howard correspondence，或 propositions as types。即“命题-类型同构”，也就是说我们可以把命题的逻辑编码在类型里，假如能构造出对应的类型，那就说明命题成立。</li>
+<li>接上一条，Algebraic data type（ML系语言中常见的类型系统）的一个重要意义就是建立有效状态和可合法构造类型的同构（等价的说，把无效状态表达成类型错误）。DT 更是把这一点发扬光大，能够把很多 bug 扼杀在编译期，并给 <em>类型驱动开发</em> 提供支持。</li>
+</ol>
+<p>了解了第一点，就能看懂 <code>interpTy : Ty -&gt; Type</code> 这个声明就是把解释器内部的类型 <code>Ty</code> 转换成 Idris 的原生类型返回。了解二三点后会明白，这段代码的主要看点就是把 well-typed 这个判断编码在类型定义里，通过类型检查保证用户只能构造出类型正确的解释器输入。</p>
+<p>然后介绍一下 finite set。 Finite set 的作用是给出有上界的序数，比如要访问 n 个元素的向量 <code>Vect n a</code>，合法的下标范围是 <code>[0, n)</code>，因此 <code>index</code> 的声明是</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>Data.Vect.index <span class="op">:</span> <span class="dt">Fin</span> len <span class="ot">-&gt;</span> <span class="dt">Vect</span> len <span class="fu">elem</span> <span class="ot">-&gt;</span> <span class="fu">elem</span></span></code></pre></div>
+<p>对第一个参数的类型约束让调用方无法构造出越界的下标，确保了程序的正确性。</p>
+<p>Finite set 又是怎样做到约束上界的呢？它的定义如下：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">data</span> <span class="dt">Fin</span> <span class="op">:</span> <span class="dt">Nat</span> <span class="ot">-&gt;</span> <span class="dt">Type</span> <span class="kw">where</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>   <span class="dt">FZ</span> <span class="op">:</span> <span class="dt">Fin</span> (<span class="dt">S</span> k)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>   <span class="dt">FS</span> <span class="op">:</span> <span class="dt">Fin</span> k <span class="ot">-&gt;</span> <span class="dt">Fin</span> (<span class="dt">S</span> k)</span></code></pre></div>
+<p>以 <code>Fin 3</code> 为例，如果元素数量为 3，那么应该只允许 0、1、2 这三个序数。所以 <code>Fin 3</code> 的定义必须保证只能构造出 <code>FZ</code>、<code>FS FZ</code> 和 <code>FS (FS FZ)</code>。我们来试一下：</p>
+<ul>
+<li>令 <code>k = 2</code>，可以构造出 <code>the (Fin 3) FZ</code></li>
+<li>令 <code>k = 1</code>，得到 <code>the (Fin 2) FZ</code>，代入后 <code>FS FZ</code> 的类型是 <code>Fin (S 2)</code>，因此构造出 <code>the (Fin 3)   (FS FZ)</code></li>
+<li>同样的，令 <code>k = 0</code>，应用 <code>FS</code> 两次得到 <code>the (Fin 3) (FS (FS FZ))</code></li>
+<li>其他的值就不行了</li>
+</ul>
+<p>不难发现其中的规律。</p>
+<p>现在回到解释器的代码，<code>HasType</code> 的定义也是基于同样道理。 <code>HasType</code> 的作用是证明某个解释器变量具有给定的类型，well-typed 就由它保障。那么在证明中用什么方式指定变量呢？并不是通常用的“变量名”，而是编号。这里要再引入一个概念 <a href="https://en.wikipedia.org/wiki/De_Bruijn_index">de Bruijn index</a>，即在λ演算中根据当前环境上下文约束变量（bound variable）的相对位置用序数（因此出现了 <code>i : Fin n</code>）来隐式指定。这样 <code>λx. λy. λz. x z (y z)</code> 就写作 <code>λ λ λ 2 0 (1 0)</code> (0-based)，这里 0、1、2 是由位置决定的编号。（听说在某些公司和监狱里，彼此称呼真实姓名是禁止的，只能用花名或编号代替，有人直到离职或出狱都不知道同事或狱友的真名。这算是 de Bruijn index 在现实世界的一个应用。）</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">data</span> <span class="dt">HasType</span> <span class="op">:</span> (i <span class="op">:</span> <span class="dt">Fin</span> n) <span class="ot">-&gt;</span> <span class="dt">Vect</span> n <span class="dt">Ty</span> <span class="ot">-&gt;</span> <span class="dt">Ty</span> <span class="ot">-&gt;</span> <span class="dt">Type</span> <span class="kw">where</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    <span class="dt">Stop</span> <span class="op">:</span> <span class="dt">HasType</span> <span class="dt">FZ</span> (<span class="ot">t ::</span> ctxt) t</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>    <span class="dt">Pop</span>  <span class="op">:</span> <span class="dt">HasType</span> k ctxt t <span class="ot">-&gt;</span> <span class="dt">HasType</span> (<span class="dt">FS</span> k) (<span class="ot">u ::</span> ctxt) t</span></code></pre></div>
+<p><code>HasType i ctxt T</code> 是一个关于上下文 <code>ctxt</code> 的第 <code>i</code> 个变量具有类型 <code>T</code> 的证明。看一下 <code>Stop</code> 和 <code>Pop</code> 的定义：</p>
+<ol type="1">
+<li>当 i = 0，不妨设上下文的第 0 个变量类型是 <code>T</code>，那么可以构造 <code>the (HasType FZ (T::ctxt) T) Stop</code></li>
+<li>如果已经证明上下文的第 <code>k</code> 个变量类型是 <code>T</code>，设对应的证明（类型）是 <code>the (HasType k ctxt T) h</code>，则应用一次 <code>Pop</code> 可得 <code>the (HasType (FS k) (u :: ctxt) T) (Pop h)</code>，表示对于加上 <code>u</code> 后新的上下文（即把 <code>u</code> 压栈后，外层的 lambda 对应的上下文）来说， “第 <code>(k + 1)</code> 个变量类型为 <code>T</code>” 这个命题成立。</li>
+</ol>
+<p>还有一些需要注意的细节：</p>
+<ul>
+<li><code>lookup</code> 声明的返回值类型 <code>interpTy t</code> 是 Idris 原生类型。<code>lookup</code> 定义中的 <code>(::)</code> 是自定义的 <code>Env.::</code> 而非 <code>Data.Vect.::</code>。</li>
+<li><code>Lam</code> 对应返回解释器类型 <code>TyFun</code> 的表达式，<code>interp env (Lam sc)</code> 返回一个原生 lambda，于是在 <code>interp env (App f s) = interp env f (interp env s)</code> 中 <code>interp env f</code> 是一个 lambda，刚好对它应用 <code>interp env s</code> 的值。</li>
+</ul>
+<p>其他内容和 DT 关系不大。至此，应该能理解全部代码了。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

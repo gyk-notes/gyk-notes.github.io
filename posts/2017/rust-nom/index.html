@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 难用的nom</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>难用的nom</h1>
+            <div class="info">
+    Posted on March  3, 2017
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p><a href="https://github.com/Geal/nom">nom</a> 是 Rust 语言的一个 parser combinator 库，在最近开始的一个新项目里我们用它来解析二进制协议。我目前的体会是：nom 至少对于 Rust 初学者来说很难用。</p>
+<p>来看一段解析流媒体协议 message header 的真实代码。所需完成的功能是读取 chunk stream ID：</p>
+<ol type="1">
+<li>首先对第一个字节和 <code>0b111111</code> 求与运算后得到 stream ID</li>
+<li>Stream ID 如果是0或1表示使用了 extended stream ID：
+<ul>
+<li>如果为0，stream ID等于下一个字节表示的整数加上 <code>0b1000000</code></li>
+<li>如果为1，stream ID等于下两个字节（大端）表示的整数加上 <code>0b1000000</code></li>
+</ul></li>
+</ol>
+<p>很简单的逻辑对吧，可是就这么仅仅五行代码我就标注了两个 WORKAROUND：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode rust"><code class="sourceCode rust"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">let</span> (input<span class="op">,</span> basic_header) <span class="op">=</span> <span class="pp">try_parse!</span>(input<span class="op">,</span> <span class="pp">do_parse!</span>(</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>    <span class="co">// WORKAROUND: see https://github.com/Geal/nom/issues/308</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>    stream_id<span class="op">:</span> <span class="pp">switch!</span>(<span class="pp">map!</span>(<span class="pp">take!</span>(<span class="dv">0</span>)<span class="op">,</span> <span class="op">|</span>_<span class="op">|</span> partial_stream_id)<span class="op">,</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>          <span class="dv">0</span> <span class="op">=&gt;</span> <span class="pp">map!</span>(be_u8<span class="op">,</span> <span class="op">|</span>x<span class="op">|</span> x <span class="kw">as</span> <span class="dt">u32</span> <span class="op">+</span> <span class="dv">64</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>        <span class="op">|</span> <span class="dv">1</span> <span class="op">=&gt;</span> <span class="pp">map!</span>(be_u16<span class="op">,</span> <span class="op">|</span>x<span class="op">|</span> x <span class="kw">as</span> <span class="dt">u32</span> <span class="op">+</span> <span class="dv">64</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>        <span class="co">// WORKAROUND: see https://github.com/Geal/nom/issues/316</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>        <span class="op">|</span> dummy<span class="op">@</span><span class="dv">0x00</span><span class="op">...</span><span class="dv">0xFF</span> <span class="op">=&gt;</span> <span class="pp">value!</span>(partial_stream_id <span class="kw">as</span> <span class="dt">u32</span>)</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>    ) <span class="op">&gt;&gt;</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a><span class="co">// ...</span></span></code></pre></div>
+<p>第一处，按理说只要写 <code>value!(partial_stream_id)</code> 就可以，可是 Rust 的宏处理过后类型系统无法推导出返回值 <code>IResult</code> 中封装的错误类型参数 <code>E</code>。 nom 官方推荐的解决办法是拆分你的 combinator，比如这样：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode rust"><code class="sourceCode rust"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="pp">named!</span> (just_u8_value<span class="op">&lt;</span><span class="dt">u8</span><span class="op">&gt;,</span> <span class="pp">value!</span>(<span class="dv">42u8</span>))<span class="op">;</span></span></code></pre></div>
+<p>可惜这里并不是常量。试试 high-order function 但是不能编译通过：</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode rust"><code class="sourceCode rust"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">fn</span> u8_value_factory(x<span class="op">:</span> <span class="dt">u8</span>) <span class="op">-&gt;</span> <span class="dt">Box</span><span class="op">&lt;</span><span class="bu">Fn</span>(<span class="op">&amp;</span>[<span class="dt">u8</span>]) <span class="op">-&gt;</span> IResult<span class="op">&lt;&amp;</span>[<span class="dt">u8</span>]<span class="op">,</span> <span class="dt">u8</span><span class="op">&gt;&gt;</span> <span class="op">{</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    <span class="dt">Box</span><span class="pp">::</span>new(<span class="kw">move</span> <span class="op">|</span>input<span class="op">|</span> <span class="pp">IResult::</span>Done(input<span class="op">,</span> x))</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a><span class="op">}</span></span></code></pre></div>
+<p>第二处，写 <code>dummy@0x00...0xFF</code> 的原因是 nom 会自动加上 <code>_ =&gt; ...</code> 分支，这样一编译就提示 unreachable branch。</p>
+<p>为什么 nom 难用？一句话概括：当前版本的 Rust 用 macro 实现的 parser combinator 基本不会好用，和库作者的设计关系不大。具体的说：</p>
+<ol type="1">
+<li>宏带来的种种问题：
+<ul>
+<li>可读性差。包括代码、错误信息和nom本身的文档，都有一种把 Rust 写成 C++ 的感觉。</li>
+<li>编译（更）慢。虽然运行倒是很快。</li>
+<li>调试麻烦。单元测试也稍麻烦。</li>
+</ul></li>
+<li>目前 Rust 的宏/类型系统还不适合写 parser combinator:
+<ul>
+<li>类型推导太弱，比如 <a href="https://github.com/Geal/nom/issues/308" class="uri">https://github.com/Geal/nom/issues/308</a>。</li>
+<li>各种语法限制，比如不能接受 <code>::</code> 名字空间分割符（<a href="https://github.com/Geal/nom/issues/254" class="uri">https://github.com/Geal/nom/issues/254</a>）， <code>switch!</code> 报错（<a href="https://github.com/Geal/nom/issues/316" class="uri">https://github.com/Geal/nom/issues/316</a>）。</li>
+</ul></li>
+<li>语法糖不够甜：Rust 不支持 Haskell Monad + do-notation，或者 F# computation expressions 类似的语法，导致写出来的显式 combinator 视觉上不够美观。</li>
+<li>Rust 本身就不侧重函数式编程，ownership + borrow checker / upwards funarg problem 等等，让 parser combinator 写起来更加别扭。</li>
+<li>与其他代码的适配：
+<ul>
+<li>nom 是无状态的，但是大部分 decoder 库的输入都用 <code>&amp;mut [u8]</code> / <code>&amp;mut Read</code> 类型。</li>
+<li>nom 只能解码，decoder/encoder 的实现是两套风格。这在某些情况下是挺严重的缺点，因为如果编解码部分可以一一对应，二者对照测试，那么可以减少很多 bug。</li>
+</ul></li>
+<li>错误处理：
+<ul>
+<li>nom 返回自定义的 <code>IResult&lt;I, O, E = u32&gt;</code> 而不是通用的 <code>Result&lt;T, E&gt;</code>，这样 <code>try!</code>/<code>?</code> 不能用（当然你可以自定义宏）。</li>
+<li>不开 verbose-errors feature 只能用 <code>u32</code> 自定义错误码；</li>
+<li>打开以后感觉太复杂（见 <a href="https://github.com/Geal/nom/issues/394">1</a>, <a href="http://rust.unhandledexpression.com/nom/error_management.html">2</a>）。</li>
+</ul></li>
+</ol>
+<h2 id="弃用-nom">弃用 nom?</h2>
+<p>作为不用 nom 实现编解码器的一个例子，可以参考 <a href="https://github.com/sile/amf" class="uri">https://github.com/sile/amf</a>。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

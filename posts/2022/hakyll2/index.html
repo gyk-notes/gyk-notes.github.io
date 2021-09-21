@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 再次搭建Hakyll博客</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>再次搭建Hakyll博客</h1>
+            <div class="info">
+    Posted on February 12, 2022
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>去年双十二买了一台 Surface Pro 7+，最近想把之前跑在 macOS 上的 Hakyll 静态 blog 生成工具迁移到新电脑上。</p>
+<p>Hakyll 其实是一个静态网站 <em>元</em> 生成器，需要安装 Haskell 的本地开发环境才能编译出生成器的可执行文件。由于静态链接的关系，Haskell (GHC) toolchain 在 Windows 上占用空间相当大。我作为 ⊞ 信仰值普通的用户买的是 128G SSD 的低配版，硬盘空间很快就捉襟见肘，虽说 SP7+ 商用版可以更换 SSD，不过在购买大容量 SSD 之前还是得先借助其他办法。因为我平时并不写 <a href="https://xkcd.com/1312/">Haskell</a>（也基本不写 blog），根本无需本地开发环境，硬盘吃紧的情况下当然是能省则省，于是就想把整个编译流程放到 GitHub CI 上。</p>
+<p>以下记录操作步骤：</p>
+<ol type="1">
+<li>我不是 GitHub 付费用户，为了能跑 CI，被迫开源本站写得很挫的代码：<a href="https://github.com/gyk/my-hakyll/">my-hakyll</a>。</li>
+<li>GitHub Action 配置在此：<a href="https://github.com/gyk/my-hakyll/blob/main/.github/workflows/build.yml"><code>.github/workflows/build.yml</code></a></li>
+<li>据我测试，去缓存整个 stack 安装目录反而会影响速度，因此只缓存了 <code>~/.stack</code>。</li>
+<li>编译出的可执行文件超过 100MB（代码总共也就100多行，Orz），尝试加 <code>-split-sections</code> 参数优化大小但编译出错。直接用 <code>-O0</code> 关闭优化倒是明显减小了目标文件，编译速度也有很大提升。</li>
+<li>CI 跑完后只需下载生成的 artifact 即可。</li>
+</ol>
+<p>正好 Surface 和 GitHub 同属微软产品，薅 GitHub 的羊毛补 Surface 的硬盘，形成一个完美的内循环。把这套工作流亲自部署到 GitHub 上之后，本地完全去 Haskell 化，彻底脱钩 GHC 工具链，我终于保住了硬盘上的《欧洲卡车模拟2》。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

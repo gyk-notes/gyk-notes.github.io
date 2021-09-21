@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 通关4Clojure</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>通关4Clojure</h1>
+            <div class="info">
+    Posted on March  6, 2016
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>这段时间终于做完了<a href="www.4clojure.com">4Clojure</a>上的全部练习题，代码在<a href="https://github.com/gyk/clojure-playground/tree/master/4Clojure">这里</a>。 4Clojure是一个基于Koans（“公案”，原指禅宗里帮助开悟的教学片断）风格教学法的Clojure学习网站，挑战者需要完成一系列填空题，使给出的语句成立。感觉自己动手做练习确实比之前看《Clojure Programming》的印象来得深刻。说是通关，是因为这个教程确实像打游戏的关卡设计一样，算是编程学习游戏化（Gamification）的一个尝试。 156道题从最基本的语法题到来自Euler Project的难题，一级级循序渐进，就像升级打怪一样让你不知不觉就掌握了Clojure的语法和习语。</p>
+<p>说缺点的话，主要是测试过于宽松。首先，数据量太小，即使存在<code>O(n·lg n)</code>时间复杂度的算法，写出<code>O(n^2)</code>甚至<code>O(n^3)</code>的代码一般也不会超时。很多时候也缺少边界情况的测试。其次，一些题目允许投机取巧的解法，比如第125题Gus’ Quinundrum，测试是 <code>(= (str '__) (__))</code>，我看到有人这么写：<code>(fn [x] (str x x)) '(fn [x] (str x x))</code>，并不是真正的quine但也能过关。</p>
+<p>就像有些硬核游戏玩家不满足于通关还追求速通一样，4Clojure有一个参加code golf的选项，比赛谁提交的答案最短。规则是计算非空白字符。不过我觉得如果根据Lisp的特点，不按字符数而是按atom数计分可能更好，既能golf又保持代码可读性，也不用去折腾《短码之美》里面那一类语法的细枝末节。按<a href="https://www.reddit.com/r/Clojure/comments/2fy39z/4clojure_86/ckdtljy/">本帖</a>提示，想提高高尔夫水平的话可以在4Clojure上关注maximental，学习精简代码有关的奇技淫巧。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

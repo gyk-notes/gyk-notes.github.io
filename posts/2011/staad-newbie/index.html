@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - Staad学习笔记</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>Staad学习笔记</h1>
+            <div class="info">
+    Posted on January  9, 2011
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Shit'." href="../../../tags/Shit.html">Shit</a>
+    
+</div>
+
+<h3 id="局部坐标系定义">局部坐标系定义</h3>
+<p>单独给出一根杆件，我们可以定义它的局部坐标系X轴沿着杆件轴线方向，那么如何确定Y/Z轴呢？设<span class="math inline">\(x_l\)</span>为局部坐标系<span class="math inline">\(X\)</span>轴正方向的单位矢量，<span class="math inline">\(X_G\)</span>为全局坐标， Staad中约定，如果<span class="math inline">\(x_l \mathbin{\!/\mkern-5mu/\!} Y_G\)</span>，则<span class="math inline">\(x_l=X_G \times z_l\)</span>；否则<span class="math inline">\(x_l=Y_G \times z_l\)</span>（一般情况）。然后<span class="math inline">\(y_l\)</span>根据<span class="math inline">\(y_l=z_l \times x_l\)</span>来确定。注意这和AutoCAD中的局部坐标规定（任意轴算法，Arbitrary Axis Algorithm）是不一样的，虽然二者同属于右手坐标系。</p>
+<h3 id="荷载方向局部全局和投影">荷载方向：局部、全局和投影</h3>
+<p>在Staad中为构件荷载指定的方向有三种类别：局部方向(X/Y/Z)、全局方向(GX/GY/GZ)和投影方向(PX/PY/PZ)。究竟应该用哪一种呢？举一个具体的例子：</p>
+<ul>
+<li>对于一根梁，如果用作水下某个中空结构的护壁支撑，因为水压力始终垂直于梁的轴线，亦即指向它的局部坐标-Y轴，所以荷载方向就应该用局部方向(X/Y/Z)；</li>
+<li>如果这根梁用来支撑坡屋面，那么不管倾斜的角度多大，屋面板重传递给梁的力大小始终一样，方向永远是全局-Y，所以荷载方向就属于全局方向(GX/GY/GZ)；</li>
+<li>如果是作为构架柱的一根与地面夹角为<span class="math inline">\(\theta\)</span>的杆，那么当水平方向的风吹来的时候，水平风荷载投影到斜杆上的线密度自然会减小到原来的<span class="math inline">\(\sin\theta\)</span>倍，而方向始终指向全局的水平向。换句话说，这种情况下线荷载的作用长度按投影方向减小，所以应该选用投影方向(PX/PY/PZ)荷载。</li>
+</ul>
+<h3 id="铰接与节点释放">铰接与节点释放</h3>
+<p>桁架是一种由铰接杆件组成的结构形式，在钢结构大跨建筑中尤为常见。有些结构虽不是严格意义上的桁架，但是节点弯矩不起主导作用，也可以简化成桁架分析。用Staad对桁架建模时，不恰当的铰节点弯矩释放(MEMBER RELEASE)往往是一大堆Warning的来源。</p>
+<p>几种常见错误：</p>
+<ul>
+<li>在已释放的杆端加节点弯矩；</li>
+<li>把杆件两端的 <span class="math inline">\(M_x\)</span> 都释放掉。这样一来杆件便可以绕自身轴线自由转动，运行的时候Staad会抱怨说某某杆件的 <span class="math inline">\(M_x\)</span> 方向刚度为0（当然这并不影响计算结果）；</li>
+<li>不假思索的用快捷方式把整体结构刷成桁架。这将造成不正确的常变或者瞬变连接。下图就是一个例子，中间段的“K”形节点成为铰接点以后，它的平面外连接将是瞬变的。</li>
+</ul>
+<p><img src="MemberRelease.png" width="386"></p>
+<hr />
+<p><strong>附</strong>：Notepad++中的Staad模型文件(.std)定义</p>
+<p>Staad自带的命令编辑窗口功能偏弱，所以我们希望能用专业的文本编辑软件取代它。这里给出用Notepad++编辑std文件的文本着色定义。需要在Notepad++目录下的 <code>userDefineLang.xml</code> 文件里加入下面的代码：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode xml"><code class="sourceCode xml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">&lt;NotepadPlus&gt;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>    <span class="kw">&lt;UserLang</span><span class="ot"> name=</span><span class="st">&quot;Staad&quot;</span><span class="ot"> ext=</span><span class="st">&quot;std&quot;</span><span class="kw">&gt;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>        <span class="kw">&lt;Settings&gt;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>            <span class="kw">&lt;Global</span><span class="ot"> caseIgnored=</span><span class="st">&quot;yes&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>            <span class="kw">&lt;TreatAsSymbol</span><span class="ot"> comment=</span><span class="st">&quot;no&quot;</span><span class="ot"> commentLine=</span><span class="st">&quot;yes&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>            <span class="kw">&lt;Prefix</span><span class="ot"> words1=</span><span class="st">&quot;no&quot;</span><span class="ot"> words2=</span><span class="st">&quot;no&quot;</span><span class="ot"> words3=</span><span class="st">&quot;no&quot;</span><span class="ot"> words4=</span><span class="st">&quot;no&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>        <span class="kw">&lt;/Settings&gt;</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>        <span class="kw">&lt;KeywordLists&gt;</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>            <span class="kw">&lt;Keywords</span><span class="ot"> name=</span><span class="st">&quot;Delimiters&quot;</span><span class="kw">&gt;</span>000000<span class="kw">&lt;/Keywords&gt;</span></span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>            <span class="kw">&lt;Keywords</span><span class="ot"> name=</span><span class="st">&quot;Folder+&quot;</span><span class="kw">&gt;</span>START *BLOCK<span class="kw">&lt;/Keywords&gt;</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>            <span class="kw">&lt;Keywords</span><span class="ot"> name=</span><span class="st">&quot;Folder-&quot;</span><span class="kw">&gt;</span>END *ENDBLOCK<span class="kw">&lt;/Keywords&gt;</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>            <span class="kw">&lt;Keywords</span><span class="ot"> name=</span><span class="st">&quot;Operators&quot;</span><span class="kw">&gt;</span>- .<span class="kw">&lt;/Keywords&gt;</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>            <span class="kw">&lt;Keywords</span><span class="ot"> name=</span><span class="st">&quot;Comment&quot;</span><span class="kw">&gt;</span>1 2 0*<span class="kw">&lt;/Keywords&gt;</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>            <span class="kw">&lt;Keywords</span><span class="ot"> name=</span><span class="st">&quot;Words1&quot;</span><span class="kw">&gt;</span>TO<span class="kw">&lt;/Keywords&gt;</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a>            <span class="kw">&lt;Keywords</span><span class="ot"> name=</span><span class="st">&quot;Words2&quot;</span><span class="kw">&gt;</span>JOINT MEMBER MEMB ELEMENT ELEM LOAD UNIT<span class="kw">&lt;/Keywords&gt;</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a>            <span class="kw">&lt;Keywords</span><span class="ot"> name=</span><span class="st">&quot;Words3&quot;</span><span class="kw">&gt;</span>;<span class="kw">&lt;/Keywords&gt;</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a>            <span class="kw">&lt;Keywords</span><span class="ot"> name=</span><span class="st">&quot;Words4&quot;</span><span class="kw">&gt;&lt;/Keywords&gt;</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true"></a>        <span class="kw">&lt;/KeywordLists&gt;</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true"></a>        <span class="kw">&lt;Styles&gt;</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;DEFAULT&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;11&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;0000FF&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;Courier New&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;FOLDEROPEN&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;12&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;FF8000&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;FOLDERCLOSE&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;13&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;FF8000&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;KEYWORD1&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;5&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;400080&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;1&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;KEYWORD2&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;6&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;0080FF&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;KEYWORD3&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;7&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;FF0000&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;KEYWORD4&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;8&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;008080&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;COMMENT&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;1&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;000000&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;COMMENT LINE&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;2&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;008000&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;2&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;NUMBER&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;4&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;000000&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;OPERATOR&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;10&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;000000&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;DELIMINER1&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;14&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;000000&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;DELIMINER2&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;15&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;000000&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true"></a>            <span class="kw">&lt;WordsStyle</span><span class="ot"> name=</span><span class="st">&quot;DELIMINER3&quot;</span><span class="ot"> styleID=</span><span class="st">&quot;16&quot;</span><span class="ot"> fgColor=</span><span class="st">&quot;000000&quot;</span><span class="ot"> bgColor=</span><span class="st">&quot;FFFFFF&quot;</span><span class="ot"> fontName=</span><span class="st">&quot;&quot;</span><span class="ot"> fontStyle=</span><span class="st">&quot;0&quot;</span> <span class="kw">/&gt;</span></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true"></a>        <span class="kw">&lt;/Styles&gt;</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true"></a>    <span class="kw">&lt;/UserLang&gt;</span></span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true"></a><span class="kw">&lt;/NotepadPlus&gt;</span></span></code></pre></div>
+<p>我只给<code>JOINT</code>，<code>MEMBER</code>几个关键词加了语法高亮效果，然后自定义了<code>*BLOCK</code>/<code>*ENDBLOCK</code>块，方便折叠代码。显示效果如下：</p>
+<p><img src="NppStaadSample.png" /></p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

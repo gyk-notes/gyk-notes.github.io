@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - Boost正则表达式Bug</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>Boost正则表达式Bug</h1>
+            <div class="info">
+    Posted on September  4, 2010
+    
+</div>
+<div class="info">
+    
+    Tags: 
+    
+</div>
+
+<p>前几天用grepWin的时候，我在搜索框里输入 <code>\d+++</code> (可能是一时小指头抽筋)以后回车，惊讶的发现grepWin居然支持这个怪异的正则表达式，于是赶紧到Google Code上给项目提交了一份bug报告。 第二天发现作者把我发布的issue标记成了无效。他的意见一是 <code>\d+++</code> 是个低效但完全符合标准的正则表达式，就等价于 <code>((\d+)+)+</code>，二是grepWin用的是Boost的regex库，所以请直接向Boost方面汇报吧。 我对 <code>\d+++</code> 等价于 <code>((\d+)+)+</code> 的说法深表怀疑，如果这么解释成立的话正则引擎如何区分 <code>\d+?</code> 到底是非贪心的 <code>\d+</code> 还是 <code>(\d+)?</code> 呢？ 于是就去下载了Boost 1.44版，用Visual C++ 2008 Express编译运行以下代码：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="dt">wchar_t</span>* s = <span class="st">L&quot;abc123&quot;</span> ;</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>wregex e(<span class="st">L&quot;</span><span class="sc">\\</span><span class="st">d+++&quot;</span>, <span class="ex">boost::</span>regex<span class="ex">::</span>normal) ;</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>wcmatch m ;</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a><span class="cf">if</span>(regex_search(s, m, e)){</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>    wcout &lt;&lt;  m[<span class="dv">0</span>] &lt;&lt; endl ;</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>}</span></code></pre></div>
+<p>输出结果123。这里测试的是 <code>\\d+++</code>，但是实际上不管有几个 <code>+</code> 效果都一样。看来问题确实出在boost::regex上。 首先来看 <code>\d++</code> 这个表达式。如果你在Python里测试它，会产生一个“sre_constants.error: multiple repeat”的错误。在C#里运行会抛出一个异常，提示“System.ArgumentException: parsing”+" - Nested quantifier +“。就连boost::xpressive也不支持。所以正则规范中并没有用重复的量词(quantifier)来表示嵌套这种说法。 而在Perl 5.x里，<code>\d++</code> 就是有意义的了，但是并非被解析为 <code>(\d+)+</code>，而是将其看作 <code>\d+</code> 的“独占式”(possessive)版本。 正则表达式的quantifier在默认情况下是贪心(greedy)的，也就是说会往前匹配尽可能多的字符。如果在量词后面紧跟着一个修饰符 <code>?</code> ，那么就是对应的非贪心(匹配尽可能少的字符)版本。 至于possessive quantifier，则是一个比greedy quantifier更贪婪的东西，基本可以把它看作从不回溯的greedy quantifier。在普通量词后面加上一个 <code>+</code> 就构成了possessive量词，它的意义在于消除无用的回溯，提高匹配效率。 举个例子：对于字符串 <code>"1234545"</code>， <code>\d+45</code> 匹配 <code>"1234545"</code>; <code>\d+?45</code> 匹配 <code>"12345"</code>; 而 <code>\d++45</code> 由于 <code>\d++</code> 一开始就吞掉了整个文本并拒绝吐出，造成 <code>45</code> 无从配对，所以最后的结果是no match。 我一测试发现boost::regex是支持Perl 5风格的possessive quantifier的，但是即使是Perl也不认识一连串三个加号的写法。 目前Boost维护者已确认这是一个bug，产生原因是在possessive的条件分支中没有添加必要的错误处理。修正以后 <code>"\\d+++"</code> 会引发一个 <code>regex_constants::error_badrepeat</code> 错误。不过话又说回来，这个微不足道的bug对于Boost和grepWin来说其实都无伤大雅，但是从严谨性的角度考虑，我想还是有修复的必要。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - lzms：懒汉版扫雷</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>lzms：懒汉版扫雷</h1>
+            <div class="info">
+    Posted on February 25, 2016
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>, <a title="All pages tagged 'Game'." href="../../../tags/Game.html">Game</a>
+    
+</div>
+
+<p>玩扫雷打发时间的闲人不在少数，但是对于既闲又很懒的人来说，原版扫雷一个格子一个格子点过去的游戏过程实在太伤神了。比如，标记“1”的方格周围已经有7个格子被打开了，那么剩下的那个显然就是地雷。这么一目了然的事情居然还有劳懒汉们亲自动手，简直就是对人家懒惰美德之侮辱。</p>
+<p>于是我就写了这个懒汉版的扫雷游戏lzms。 lzms这个名字本身就是LaZy MineSweeper的偷懒式拼写（lazy spelling）。在游戏里所有的“平凡”雷区都会帮您自动搞定，避免出现传统扫雷中这类侮辱你智商的场景。不过这种设置也带来一个问题，就是即使完全不懂扫雷技巧，只要随便瞎点也很有可能过关。所以啊玩家一定要自觉，这可不是比拼手速的操作密集型游戏，记得minimize the guesswork so you don’t spoil the fun。</p>
+<p>这算是我写的第一个“非平凡”JavaScript程序了。在编写过程中尝试了NodeJS，RequireJS，Underscore.js, GruntJS等技术，还是蛮有趣的（据说GruntJS已经过时了？）。其实自己最满意的地方还是UI：整体是用CSS撸出的类Windows 3.1复古界面，专门用了SVG图标保证浏览器放大的时候不被高斯模糊，再配上像素风格的字体，以享受纯正的pixel art。一直崇拜经典的Win3.1，本游戏可以看做是遵循Atwood法则向微软帝国的the good old days致敬。</p>
+<p>lzms在线玩地址：<a href="http://gyk.github.io/lzms" class="uri">http://gyk.github.io/lzms</a><br> Fork me on GitHub的传送门：<a href="https://github.com/gyk/lzms" class="uri">https://github.com/gyk/lzms</a></p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

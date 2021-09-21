@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - The Juggling of Three Jugs</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>The Juggling of Three Jugs</h1>
+            <div class="info">
+    Posted on April 23, 2011
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Puzzle'." href="../../../tags/Puzzle.html">Puzzle</a>, <a title="All pages tagged 'Python'." href="../../../tags/Python.html">Python</a>
+    
+</div>
+
+<p>下面这道题目经常能在杂志的趣味问答版找到：</p>
+<blockquote>
+<p>三个水罐容积分别是L, M, N。L为偶数且L = M + N。现在容积L的水罐里面装满了水，另两个为空，问能否用这些水罐把水平分？</p>
+</blockquote>
+<p>据说历史上不少伟人，比如韩信、泊松以及《虎胆龙威》的男主角，都有过平分液体的经历。本问题的解法需要杂耍般的倒腾水罐，这就是本文标题的由来。</p>
+<p><strong>解答</strong>：把三个水罐编号为J<sub>L</sub>，J<sub>M</sub>，J<sub>N</sub>。首先，我们可以发现L = M + N是一个关键条件，这么一来只要知道L, M, N中任意两个互质就可以推出三者两两互质。设L, M, N的最大公约数为k，把三个水罐和水按比例k缩小后，新问题与原问题等价。为方便起见，以下我们只针对L, M, N最大公约数为1的情况讨论。显然当L为奇数时，无法量出L/2体积的水。</p>
+<p>用代数运算的方式来描述每次倒水，可以知道：操作X→Y实际转移的液体量 = min(Y的容量 - Y中液体体积, X中液体体积)。比如当L=20, M=7, N=13的时候，从初始状态出发：</p>
+<pre><code>[20, 0, 0]    [L, 0, 0]</code></pre>
+<p>第一步是从水罐J<sub>L</sub>到J<sub>N</sub></p>
+<pre><code>[7, 0, 13]    [M, 0, L-M]</code></pre>
+<p>然后依次是：</p>
+<pre><code>[7, 7, 6]     [M, M, L-2M]
+[14, 0, 6]    [2M, 0, L-2M]
+...
+[3, 7, 10]    [9M-3L, M, 4L-10M]
+[10, 0, 10]   [10M-3L, 0, 4L-10M]</code></pre>
+<p>这样就把水等分了。以下是Python写的求解程序，用的是BFS (top-down DP, memoization)：</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="co">&quot;&quot;&quot;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a><span class="co">Three Jugs Problem Solver</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a><span class="co">&quot;&quot;&quot;</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a><span class="im">from</span> collections <span class="im">import</span> defaultdict</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a><span class="im">from</span> itertools <span class="im">import</span> permutations</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a><span class="kw">def</span> three_jugs(L, M, N, O):</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>    capacities <span class="op">=</span> [L, M, N]</span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a>    mem <span class="op">=</span> defaultdict(<span class="bu">int</span>)</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a>    from_to <span class="op">=</span> <span class="bu">list</span>(permutations(<span class="bu">range</span>(<span class="dv">3</span>), <span class="dv">2</span>))</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a>    <span class="kw">def</span> pouring(state, operation):</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a>        state <span class="op">=</span> <span class="bu">list</span>(state)</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a>        src, dest <span class="op">=</span> operation</span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a>        v <span class="op">=</span> <span class="bu">min</span>(state[src], capacities[dest] <span class="op">-</span> state[dest])</span>
+<span id="cb4-17"><a href="#cb4-17" aria-hidden="true"></a>        state[src] <span class="op">-=</span> v</span>
+<span id="cb4-18"><a href="#cb4-18" aria-hidden="true"></a>        state[dest] <span class="op">+=</span> v</span>
+<span id="cb4-19"><a href="#cb4-19" aria-hidden="true"></a>        <span class="cf">return</span> <span class="bu">tuple</span>(state)</span>
+<span id="cb4-20"><a href="#cb4-20" aria-hidden="true"></a></span>
+<span id="cb4-21"><a href="#cb4-21" aria-hidden="true"></a>    <span class="kw">def</span> pour(states, depth):</span>
+<span id="cb4-22"><a href="#cb4-22" aria-hidden="true"></a>        <span class="bu">next</span> <span class="op">=</span> []</span>
+<span id="cb4-23"><a href="#cb4-23" aria-hidden="true"></a>        <span class="cf">for</span> s <span class="kw">in</span> states:</span>
+<span id="cb4-24"><a href="#cb4-24" aria-hidden="true"></a>            <span class="cf">if</span> O <span class="kw">in</span> s:</span>
+<span id="cb4-25"><a href="#cb4-25" aria-hidden="true"></a>                <span class="bu">print</span> <span class="st">'</span><span class="ch">\n</span><span class="st">n = </span><span class="sc">%d</span><span class="st">'</span> <span class="op">%</span> depth</span>
+<span id="cb4-26"><a href="#cb4-26" aria-hidden="true"></a>                <span class="cf">return</span> s</span>
+<span id="cb4-27"><a href="#cb4-27" aria-hidden="true"></a>            <span class="cf">for</span> op <span class="kw">in</span> from_to:</span>
+<span id="cb4-28"><a href="#cb4-28" aria-hidden="true"></a>                new_state <span class="op">=</span> pouring(s, op)</span>
+<span id="cb4-29"><a href="#cb4-29" aria-hidden="true"></a>                <span class="cf">if</span> mem[new_state]:</span>
+<span id="cb4-30"><a href="#cb4-30" aria-hidden="true"></a>                    <span class="cf">continue</span></span>
+<span id="cb4-31"><a href="#cb4-31" aria-hidden="true"></a>                mem[new_state] <span class="op">=</span> s</span>
+<span id="cb4-32"><a href="#cb4-32" aria-hidden="true"></a>                <span class="bu">next</span>.append(new_state)</span>
+<span id="cb4-33"><a href="#cb4-33" aria-hidden="true"></a>        <span class="cf">if</span> <span class="bu">next</span>:</span>
+<span id="cb4-34"><a href="#cb4-34" aria-hidden="true"></a>            <span class="cf">return</span> pour(<span class="bu">next</span>, depth <span class="op">+</span> <span class="dv">1</span>)</span>
+<span id="cb4-35"><a href="#cb4-35" aria-hidden="true"></a></span>
+<span id="cb4-36"><a href="#cb4-36" aria-hidden="true"></a>    trace <span class="op">=</span> pour([(L, <span class="dv">0</span>, <span class="dv">0</span>)], <span class="dv">0</span>)</span>
+<span id="cb4-37"><a href="#cb4-37" aria-hidden="true"></a>    output <span class="op">=</span> []</span>
+<span id="cb4-38"><a href="#cb4-38" aria-hidden="true"></a>    <span class="cf">if</span> trace:</span>
+<span id="cb4-39"><a href="#cb4-39" aria-hidden="true"></a>        <span class="cf">while</span>(trace[<span class="dv">0</span>] <span class="op">!=</span> L):</span>
+<span id="cb4-40"><a href="#cb4-40" aria-hidden="true"></a>            output <span class="op">+=</span> [<span class="bu">repr</span>(trace)]</span>
+<span id="cb4-41"><a href="#cb4-41" aria-hidden="true"></a>            trace <span class="op">=</span> mem[trace]</span>
+<span id="cb4-42"><a href="#cb4-42" aria-hidden="true"></a>    <span class="bu">print</span> <span class="st">'</span><span class="ch">\n</span><span class="st">'</span>.join(output[::<span class="op">-</span><span class="dv">1</span>])</span>
+<span id="cb4-43"><a href="#cb4-43" aria-hidden="true"></a></span>
+<span id="cb4-44"><a href="#cb4-44" aria-hidden="true"></a>three_jugs(<span class="op">*</span><span class="bu">map</span>(<span class="bu">int</span>, <span class="bu">raw_input</span>().split()))</span></code></pre></div>
+<p>这里变量O是需要倒出的目标体积。来试一下前面那个例子：</p>
+<pre><code>20 7 13 10</code></pre>
+<p>输出：</p>
+<div class="sourceCode" id="cb6"><pre class="sourceCode python"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true"></a>n <span class="op">=</span> <span class="dv">18</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true"></a>(<span class="dv">7</span>, <span class="dv">0</span>, <span class="dv">13</span>)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true"></a>(<span class="dv">7</span>, <span class="dv">7</span>, <span class="dv">6</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true"></a>(<span class="dv">14</span>, <span class="dv">0</span>, <span class="dv">6</span>)</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true"></a>...</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true"></a>(<span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">13</span>)</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true"></a>(<span class="dv">3</span>, <span class="dv">7</span>, <span class="dv">10</span>)</span></code></pre></div>
+<p>一共需要18次完成，把水平分则要19次。</p>
+<p>好，问题解决，灌水结束。</p>
+<p>…</p>
+<p>且慢！多试几组数据就会发现一个规律：当L为偶数时倒水次数等于L-1。这显然不是巧合，是可以给出严格证明的。</p>
+<p>这个命题应该可以用初等数论方法来证，但是弱逼如我，想了好久都没有头绪。于是求助Google，虽然没找到证明，但是发现网上关于Three Jugs Problem基本都在几何法的框架内讨论：我们可以把三个罐子里水的体积作为变量，放在重心坐标系（ <a href="http://en.wikipedia.org/wiki/Barycentric_coordinate_system_%28mathematics%29">Barycentric coordinate system</a> ）里面，因为是三个变量，这样得到的坐标也可以叫做三线坐标（ <a href="http://en.wikipedia.org/wiki/Trilinear_coordinates">Trilinear coordinates</a> ）。这么一来就可以把倒水过程想象成平面三角形网格上给定区域里的弹球运动，具体可以看Cut The Knot!上的<a href="http://www.cut-the-knot.org/triangle/glasses.shtml">这篇文章</a>。</p>
+<p>果然沿着这个思路想，“Eureka moment”很快就来了：</p>
+<p><strong>分析</strong>：在题目L = M + N的条件下，可以弹球的范围是一个平行四边形，如果把它掰正了，就可以在一个带左上-右下斜线的矩形网格里面表示，见<a href="http://www.cut-the-knot.org/wgraph.shtml">这里</a>。</p>
+<p>来看一个具体的例子。假设L=8，M=5，N=3，那么以水罐J<sub>M</sub>为横轴，J<sub>N</sub>为纵轴，可以作一个5×3的网格。从左下角出发，第一步可以向上走或向右走。那么第二步呢？如果再按横线或者纵线走，就会来到右上角的死胡同。这么一来第三步就到不了没访问过的点了。容易证明，一横一斜的走法才是正确的。</p>
+<p>下面这张图演示了5×3网格上的倒水路径。标号为7，坐标(4, 0)的点是目标点（在这点上水罐J<sub>M</sub>里有4个单位的水，另一半的水都在水罐J<sub>L</sub>里面）。按箭头所示，可以从0出发，经过1、2、3一直移动到7，然后按另一条路径从7’走到1’再返回0。好像有种似曾相识的感觉？Bingo！这不就是哥尼斯堡七桥问题的15桥版嘛。欧拉曾经曰过：如果图中所有的点都是偶顶点，那么一定存在一笔画路径。所以可以遍历出所有的状态，再回到初始点上。</p>
+<p><img src="three-jugs_grid3x5.png" style="width:50%;height:50%;" /></p>
+<p>到现在为止，我们起初要证明的倒水问题就等价于这个命题：对于一个N行M列的网格（M、N互质，M + N为偶数且M &lt; N），一定可以在(M + N - 1)步内从(0, 0)点走到((M+N)/2, 0)点。下面给出一个很直观的证法：</p>
+<p><img src="three-jugs_grid3x5Unfolded.png" alt="Grid 3x5 Unfolded" /><br />
+</p>
+<p>先排出一个M行N列的上述网格的阵列。然后从右下角到左上角作一条斜线。不难发现，这条线和矩形边的交点就是倒水的路径依次经过的点。每次它从一个矩形的上方或者左边穿出，再从另一个矩形的下方或者右边穿入，就相当于走了横线或者纵线。而整个图形关于C点（相对坐标为(M/2, N/2)）中心对称，图中的P1点就相当于上面说的7点，经过点C以后就相当于按另一条路径返回。</p>
+<p>那么这条线和矩形的交点会不会彼此重复呢？比如说，图中的P1和P2有没可能对于各自小矩形原点的相对坐标一样？答案是否定的，因为如果二者相同，那么就存在k1 &lt; M, k2 &lt; N使得k1×N = k2×M，这和M、N互质的条件不符。有了这个推论，只要算算有几个交点，根据鸽笼原理就可以知道需要倒水几次。</p>
+<p>因为从右下角到点C总共经过了(M-1)/2条横线，(N-1)/2条纵线，所以倒水的次数一共是(M-1)/2×2 + (N-1)/2×2+1<sub>（第一次倒水）</sub> = (M+N-1)步。也就是说，最多(M+N-1)步就可以遍历所有的点，如果可以倒出(M+N)/2的水，那么最多(M+N-1)次就可以办到。至于具体是几次，设离点C下方最近的点是P，那么P对于小矩形原点的坐标就是((M+N)/2, 0)。所以一定是最后一次才能把水等分。 Q.E.D.</p>
+<p>附赠画图的<a href="draw_diagram.m">Mathematica代码</a></p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 生日蛋糕悖论</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>生日蛋糕悖论</h1>
+            <div class="info">
+    Posted on March 14, 2009
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Probability'." href="../../../tags/Probability.html">Probability</a>, <a title="All pages tagged 'Coding'." href="../../../tags/Coding.html">Coding</a>
+    
+</div>
+
+<p>上个星期五，也就是3月6号的时候，设计院的BBS上有人发了个帖子，说这天他们部门碰巧有三位同事一起过生日，希望寿星们买个大蛋糕庆祝这难得的缘分，他也能沾沾光享用一下。在回帖里有位老兄提到了概率论课本上的经典案例：假如是60个人，那么有重复生日的概率将超过99%，所以嘛，这也不能算是太稀奇的事情。这就提出了一个严肃的问题：60个人里面至少有三个人同一天生日的概率是多少？（该问题的严肃性在于：如果能证明这个概率很小，那么他吃到蛋糕的概率就很大了）</p>
+<p>许多概率问题的答案都是反直觉的。虽然号称Birthday Paradox<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>，但是大家普遍都能接受“60个人有重复生日的概率超过99%”的事实，只因为这个例子被搬进了教科书后我们都见怪不怪了。现在，假设把5%（著名统计学常数p = 0.05）作为小概率事件的阈值，那么“三个人同一天生日”这个事件，你是押大还是押小？“恰好只有两个人同一天生日”呢？</p>
+<p>来分析一下： n个人里至少三个人生日相同的概率可以表示成:</p>
+<p><span class="math display">\[
+\begin{aligned}
+p_{\ge3}(n) &amp;= 1 - \bar p_{\ge3}(n) \\
+&amp;= 1 -p_1(n) -p_2(n) \\
+&amp;= 1 -\frac{365!}{365^n \cdot (365-n)!}
+-\sum_{i=1}^{\lfloor n/2 \rfloor}\frac{\prod_{j=0}^{i-1}{n-j \choose 2}365!}{i! \cdot 365^n \cdot (365-n+i)!}
+\end{aligned}
+\]</span></p>
+<p><span class="math inline">\(p_2(n)\)</span>其实就是把<span class="math inline">\(i\)</span>对相同生日的情况穷举列出，为了方便看得更清楚一点，把它展开如下：</p>
+<p><span class="math display">\[
+p_2(n) =
+\frac{{n \choose 2} 365!}{365^n \cdot (365-n+1)!}+
+\frac{{n \choose 2}{n-2 \choose 2} 365!}{2!\cdot 365^n \cdot (365-n+2)!}+\\
+\frac{{n \choose 2}{n-2 \choose 2}{n-4 \choose 2} 365!}{3!\cdot 365^n \cdot (365-n+3)!}+\cdots
+\]</span></p>
+<p>下面要做两件事：</p>
+<ol type="1">
+<li>用计算机代数系统求n = 60的时候这个概率的精确值；</li>
+<li>用数值计算软件跑个模拟实验验证一下。</li>
+</ol>
+<p>我用的工具是Maxima和Octave（Open source版的Mathematica和Matlab）。</p>
+<p>Maxima作为老牌CAS，有理数精确运算自然不在话下，另外自带组合数函数，对这个问题来说很方便：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode matlab"><code class="sourceCode matlab"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="va">load</span>(<span class="va">functs</span>)<span class="op">;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="va">n</span><span class="op">:</span><span class="fl">60</span><span class="op">;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a><span class="va">sum</span><span class="op">:</span><span class="va">item</span><span class="op">:</span><span class="va">permutation</span>(<span class="fl">365</span><span class="op">,</span><span class="va">n</span>)<span class="op">/</span><span class="fl">365</span><span class="op">^</span><span class="va">n</span><span class="op">;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a><span class="kw">for</span> <span class="va">i</span><span class="op">:</span><span class="fl">1</span> <span class="kw">while</span> <span class="va">i</span><span class="op">&lt;=</span><span class="va">n</span><span class="op">/</span><span class="fl">2</span> <span class="va">do</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>    (<span class="va">item</span><span class="op">:</span><span class="va">item</span><span class="op">/</span>(<span class="fl">365</span><span class="op">-</span><span class="va">n</span><span class="op">+</span><span class="va">i</span>)<span class="op">*</span><span class="va">combination</span>(<span class="va">n</span><span class="op">-</span><span class="fl">2</span><span class="op">*</span>(<span class="va">i</span><span class="op">-</span><span class="fl">1</span>)<span class="op">,</span><span class="fl">2</span>)<span class="op">/</span><span class="va">i</span><span class="op">,</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>     <span class="va">sum</span><span class="op">:</span><span class="va">sum</span><span class="op">+</span><span class="va">item</span>)<span class="op">;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a><span class="va">display</span>(<span class="va">bfloat</span>(<span class="fl">1</span><span class="op">-</span><span class="va">sum</span>))<span class="op">;</span></span></code></pre></div>
+<p>经过眼一闭再一睁的工夫，Maxima就给出了答案0.2072303206…，超过了1/5。另一方面，恰好只有两个人生日相同的概率就是<span class="math inline">\(p_2(n)\)</span>的第一项，差不多5%不到。和根据直觉的猜测接近吗？</p>
+<p>在下结论之前，我们再来用随机数发生器做一个实验。执行下面的Octave/Matlab代码：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode matlab"><code class="sourceCode matlab"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="va">nPeople</span> <span class="op">=</span> <span class="fl">60</span><span class="op">;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a><span class="va">atLeast</span> <span class="op">=</span> <span class="fl">3</span><span class="op">;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a><span class="va">nTrials</span> <span class="op">=</span> <span class="fl">1000000</span><span class="op">;</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a><span class="va">passed</span> <span class="op">=</span> <span class="fl">0</span><span class="op">;</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a><span class="kw">for</span> <span class="va">i</span> <span class="op">=</span> <span class="fl">1</span><span class="op">:</span><span class="va">nTrials</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>    <span class="va">birthdays</span> <span class="op">=</span> <span class="va">randi</span>(<span class="fl">365</span><span class="op">,</span><span class="fl">1</span><span class="op">,</span><span class="va">nPeople</span>)<span class="op">;</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>    <span class="va">counter</span> <span class="op">=</span> <span class="va">histc</span>(<span class="va">birthdays</span><span class="op">,</span><span class="fl">1</span><span class="op">:</span><span class="fl">365</span>)<span class="op">;</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>    <span class="va">passed</span> <span class="op">=</span> <span class="va">passed</span><span class="op">+</span>(<span class="va">max</span>(<span class="va">counter</span>)<span class="op">&gt;=</span><span class="va">atLeast</span>)<span class="op">;</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a><span class="kw">end</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a><span class="va">fprintf</span>(<span class="ss">'%.*f\n'</span><span class="op">,</span><span class="va">ceil</span>(<span class="va">log10</span>(<span class="va">nTrials</span>))<span class="op">,</span><span class="va">passed</span><span class="op">/</span><span class="va">nTrials</span>)<span class="op">;</span></span></code></pre></div>
+<p>程序一共完成了一百万次模拟，稍等片刻，就会看到和理论值相当吻合的结果 – 我这里是0.207292。</p>
+<p>这两段代码加起来不到20行，但是从两方面解答了问题，真是a piece of cake。最终的结论是：60个人里恰好只有两个人生日相同的概率不到百分之五，而至少有三个人生日相同的概率超过五分之一。前者是小概率事件，BBS上讨论的后者不是。所以，no piece of cake。</p>
+<p>仔细想一想，我们曾经从课本上了解到60个人生日各异的几率很小，却不一定能意识到其中生日相同者平均的说远不止一组，大概就是这一思维盲点导致我们会对上面的结论感到惊讶吧。</p>
+<section class="footnotes" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1" role="doc-endnote"><p>Birthday Paradox本身没有逻辑上的自相矛盾之处，之所以得名paradox只在于它的反直觉。白马非马，生日悖论不是悖论。<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

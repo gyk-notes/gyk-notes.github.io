@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - BlockOutLine游戏</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>BlockOutLine游戏</h1>
+            <div class="info">
+    Posted on March 28, 2014
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Game'." href="../../../tags/Game.html">Game</a>
+    
+</div>
+
+<p>BlockOutLine是我最近写的一个3D版的类俄罗斯方块游戏。游戏的名字是由<a href="http://en.wikipedia.org/wiki/Blockout">Blockout</a>和outline（轮廓线）组合成的。</p>
+<p><img src="Screenshot1.png" alt="Screenshot" width="70%" /></p>
+<p>Blockout算是正宗的3D俄罗斯方块（可以试试<a href="http://www.3dtris.de/">3dtris</a>，一个很赞的flash实现），我这个BlockOutLine的玩法规则和Blockout一模一样（填满每层后消去方块），但是游戏者看到的界面并非原版的鸟瞰透视视图，而是后/左/前/右四个侧面的2D投影。这个设定的意图就像下面这个<a href="http://xkcd.com/721/">xkcd漫画</a>展示的那样，假设你是生活在二维世界中的flatland居民，该怎么玩3D俄罗斯方块呢？那就只有靠平面投影来反推了。</p>
+<p><img src="flatland.png" alt="Flatland" width="90%" /></p>
+<p>绘制工程设计图（建筑/机械制图）实际上是在用2D投影表达3D构件，相反地，识图则是解读2D图面信息在大脑中翻译成3D形体。二者都需要一定的空间想象能力。所幸这是可以训练的：有研究表明，虽然通常女性的空间能力测试分数比男性低整整一个标准差，但只要玩几个小时第一人称射击游戏差异就会明显缩小，更惊人的是这种能力提升可以保持到5个月之后<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>！伦敦出租车司机长期在错综复杂的街道穿行，以至于大脑结构异于常人<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a>。另有传闻说魔方其实就是建筑学院教授Ernő Rubik为了培养学生的空间思维而发明的教具。</p>
+<p>对于工程师来说BlockOutLine的训练更直接，因为这里图形的画法直接沿用了工程制图的约定，用实线/虚线分别表示可见/不可见轮廓。推荐未来的建筑工程师来游戏里体验搬砖的感觉。还有，本游戏玩起来的难度比想象的大，沉迷于Flappy bird无法自拔的自虐型玩家也不要错过哦。</p>
+<p>我目前的最高分：</p>
+<p><img src="GameOver.png" alt="High score" width="80%" /></p>
+<p>为什么只有3x3模式？因为对于普通人来说3x3的难度已经足够了，而且4x4以上有很多情况都无法反推出3D布局（毕竟2D重建3D本身就是个ill-posed问题）。如果有人能轻松玩转4x4甚至挑战5x5以上的难度，那么请直接和江苏卫视最弓虽大脑节目组联系（并接受详细的心理/精神检查）。</p>
+<p>源代码托管在<a href="http://github.com/gyk/BlockOutLine">GitHub</a>上。打包好的Windows可执行文件在<a href="https://github.com/gyk/BlockOutLine/releases">这里</a>下载。</p>
+<!-- 当然，空间能力的用处不止于设计领域，
+事实上，在美国Spatial ability test用来代替数学测验在青少年中寻找未来的STEM专业人才，
+因为十年期以上的纵向研究结果显示，前者才是更好的predictor[^STEM]。
+[^STEM]: Citation needed. -->
+<section class="footnotes" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1" role="doc-endnote"><p>Feng, Jing, Ian Spence, and Jay Pratt. “Playing an action video game reduces gender differences in spatial cognition.” Psychological science 18.10 (2007): 850-855.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2" role="doc-endnote"><p>Maguire, Eleanor A., Katherine Woollett, and Hugo J. Spiers. “London taxi drivers and bus drivers: a structural MRI and neuropsychological analysis.” Hippocampus 16.12 (2006): 1091-1101.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

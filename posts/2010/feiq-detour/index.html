@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 如何在飞秋上调戏女同事</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>如何在飞秋上调戏女同事</h1>
+            <div class="info">
+    Posted on September 19, 2010
+    
+</div>
+<div class="info">
+    
+    Tags: 
+    
+</div>
+
+<p><strong>摘要</strong>：本文探讨了一种简便易行的利用办公室聊天软件“飞秋”调戏女同事的方案。</p>
+<p>飞秋（FeiQ）是一款常用的局域网聊天软件，在许多禁用QQ/MSN的公司被作为内部聊天与文件传送工具，深受广大白领的喜爱。飞秋的特点是：消息直接走P2P UDP协议，缺少一个中央服务器做身份验证。这就给不法分子提供了可乘之机。</p>
+<p>不失一般性，不妨设女同事名叫Alice，她平时常常和英俊潇洒浪漫多金的男同事Bob在飞秋上聊天。你是一个叫Eve的脚本小混混（Script kiddie），企图伪装成Bob调戏Alice。</p>
+<p>步骤如下：</p>
+<ol type="1">
+<li><p>把自己的头像换成和Bob的一模一样</p></li>
+<li><p>下载微软Detours库（32位版本免费）</p></li>
+<li><p>找到 <code>ForceVersion</code> 示例，以此为基础修改代码：</p>
+<ol type="1">
+<li><p>在 <code>ForceVersion/ForceVersion.h</code> 中把 <code>VersionPayload</code> 改成：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">struct</span> NamePayLoad</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>{</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>    TCHAR computerName[MAX_PATH];</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>    TCHAR userName[MAX_PATH];</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>};</span></code></pre></div></li>
+<li><p><code>ForceVersionDLL/detourapis.h</code> 里加入如下声明（这两个函数的签名是一样的）：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">typedef</span> BOOL WINAPI FuncGetName(LPWSTR lpBuffer, LPDWORD pcbBuffer);</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>FuncGetName (*pfuncGetComputerName) = GetComputerName;</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>FuncGetName (*pfuncGetUserName) = GetUserName;</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>FuncGetName ForceGetComputerName;</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>FuncGetName ForceGetUserName;</span></code></pre></div></li>
+<li><p>在 <code>ForceVersion/ForceVersion.cpp</code> 中，加载命令行参数：</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a>NamePayLoad payload = {<span class="dv">0</span>};</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>_tcscpy(payload.computerName, argv[<span class="dv">2</span>]);</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>_tcscpy(payload.userName, argv[<span class="dv">3</span>]);</span></code></pre></div></li>
+<li><p><code>ForceVersionDLL\ForceVersionDLL.cpp</code> 也要做相应修改，把设置版本号的代码替换成设置名字的：</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a>BOOL WINAPI ForceGetComputerName(LPWSTR lpBuffer, LPDWORD pcbBuffer)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>{</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a>    <span class="co">// ...</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a>    <span class="cf">if</span> (<span class="co">/* ... */</span>) {</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a>        <span class="co">// ...</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a>        _tcscpy(<span class="va">g_computerName</span>, pPayload-&gt;computerName);</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a>        _tcscpy(<span class="va">g_userName</span>, pPayload-&gt;userName);</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>    }</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a></span>
+<span id="cb4-10"><a href="#cb4-10" aria-hidden="true"></a>    _tcscpy(lpBuffer, <span class="va">g_computerName</span>);</span>
+<span id="cb4-11"><a href="#cb4-11" aria-hidden="true"></a>    *pcbBuffer = _tcslen(<span class="va">g_computerName</span>);</span>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true"></a></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true"></a>    <span class="cf">return</span> TRUE;</span>
+<span id="cb4-14"><a href="#cb4-14" aria-hidden="true"></a>}</span>
+<span id="cb4-15"><a href="#cb4-15" aria-hidden="true"></a></span>
+<span id="cb4-16"><a href="#cb4-16" aria-hidden="true"></a><span class="co">// ForceGetUserName, 略</span></span></code></pre></div></li>
+<li><p>然后，在 <code>ForceVersionDLL\dllmain.cpp</code> 中，绑定到我们改造过的函数，比如</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a>DetourAttach(&amp;(PVOID&amp;)pfuncGetComputerName, ForceGetComputerName);</span></code></pre></div>
+<p>其他几处也类似。</p></li>
+</ol></li>
+<li><p>构建完成，传入命令行参数 <code>feiq.exe BOB_PC Bob</code> 运行Detours，看看你飞秋上的主机名和用户名，是不是已经足以乱真？下面如何行事就全靠你的想象力了。</p></li>
+</ol>
+<p>虽然用户名变了，但是飞秋上显示的仍然是真实的IP地址。伪造IP地址的问题，作为课后思考题供学有余力的同学继续研究。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

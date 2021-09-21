@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - Porting "Pictorial Structures Revisited" Code to 64-bit Windows</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>Porting "Pictorial Structures Revisited" Code to 64-bit Windows</h1>
+            <div class="info">
+    Posted on June 27, 2015
+    
+</div>
+<div class="info">
+    
+    Tags: 
+    
+</div>
+
+<p><strong>Objective</strong>:</p>
+<p>Port the corresponding <a href="https://www.mpi-inf.mpg.de/departments/computer-vision-and-multimodal-computing/research/people-detection-pose-estimation-and-tracking/pictorial-structures-revisited-people-dectection-and-articulated-pose-estimation/">code</a> of the paper “M. Andriluka, S. Roth, B. Schiele. Pictorial Structures Revisited: People Detection and Articulated Pose Estimation. CVPR 09” to 64-bit Windows.</p>
+<p><strong>The original platform</strong>:</p>
+<ul>
+<li>Linux (Debian Etch, 32 bit)</li>
+<li>Qt 4.2.1</li>
+<li>Boost 1.35</li>
+<li>Matlab 2007a</li>
+<li>Protocol Buffers 2.0.1rc1</li>
+</ul>
+<p><strong>The target platform</strong>:</p>
+<ul>
+<li>Windows 8, 64-bit</li>
+<li>Qt 5.4.2 for VS 2013, 64-bit</li>
+<li>Boost 1.58</li>
+<li>Matlab 2010b 64-bit</li>
+<li>Protocol Buffers 2.6.1</li>
+</ul>
+<blockquote>
+<p><strong>Disclaimer</strong>: The porting was a request from other one and I didn’t actually test the correctness of the final executable. It was done in a hurry so whenever possible I chose quick-n-dirty way to fix problems rather than following good practices. I can only assure you the code can be successfully compiled and it’s totally runnable.</p>
+</blockquote>
+<h2 id="step-by-step-instructions">Step-by-step instructions</h2>
+<ol start="0" type="1">
+<li><p>Make sure all the components are of the same (either 32-bit or 64-bit) architecture. Suppose that you want to build an application running on 64-bit systems, so the relevant programs (Matlab) and all pre-compiled libraries (Qt, boost) must be of 64-bit. And you should configure Visual C++ according to this guide: <a href="https://msdn.microsoft.com/en-us/library/9yb4317s.aspx">How to: Configure Visual C++ Projects to Target 64-Bit Platforms</a> so that the libraries built from source (protobuf, libpng (zlib)) could be compiled into 64-bit binaries. (<a href="http://blogs.technet.com/b/windowshpc/archive/2009/03/27/how-to-tell-if-a-exe-file-is-a-32-bit-or-64-bit-application-using-dumpbin.aspx">Tip</a>: issue the command <code>dumpbin /headers fileName | findstr "magic machine"</code> to tell whether a .lib|dll|exe file is 32-bit or 64-bit.)</p></li>
+<li><p>Install Qt. Download <a href="https://www.qt.io/download-open-source/#section-2">Qt Community Edition</a>. I chose Qt 5.4.2 for Windows 64-bit (VS 2013, OpenGL, 697 MB).</p></li>
+<li><p>Build protobuf. Go to <a href="https://github.com/google/protobuf/releases" class="uri">https://github.com/google/protobuf/releases</a> and get <code>protobuf-2.6.1.zip</code>. Unzip it, open <code>\vsprojects\protobuf.sln</code> with Visual Studio and build the solution. Uncheck those “*test*” projects in “Configurarion Properties” as I am going to skip all of them, but of course it does no harm if you build all.</p>
+<p>Actually the setting in <code>\vsprojects</code> is slightly buggy. Here are some workaround to fix it:</p>
+<ul>
+<li><p>Check that “Platform Toolset” has been correctly configured before compilation: In “Solution Explorer”, Select all =&gt; Right click =&gt; properties -&gt; Configuration Properties -&gt; Platform Toolset, choose “Visual Studio 2013 (v120)” or whatever fitting your compiler.</p></li>
+<li><p>Once the compilation succeeds, run <code>\vsprojects\extract_includes.bat</code>, and then we have to manually copy <code>\src\google\protobuf\stubs\stl_util.h</code> to <code>\vsprojects\include\google\protobuf\stubs</code>.</p></li>
+</ul>
+<p><strong>Note</strong>: Now headers are in <code>\vsprojects\include\</code> and libs in <code>\vsprojects\x64\Release</code> or <code>\vsprojects\Release</code>.</p></li>
+<li><p>Build <code>libpng</code>.</p>
+<ol type="1">
+<li>From <a href="http://www.zlib.net/" class="uri">http://www.zlib.net/</a> download <code>zlib</code> source code, version 1.2.8, zipfile format. Unzip it.</li>
+<li>From <a href="http://www.libpng.org/pub/png/libpng.html" class="uri">http://www.libpng.org/pub/png/libpng.html</a> download the .zip package of source code and unzip it.</li>
+<li>Open <code>\projects\vstudio\zlib.props</code> inside <code>libpng</code> folder, and modify the following line: <code>&lt;ZLibSrcDir&gt;path\to\zlib-1.2.8&lt;/ZLibSrcDir&gt;</code></li>
+<li>Open <code>\projects\vstudio\vstudio.sln</code> in VS and build the solution.</li>
+</ol>
+<p><strong>Note</strong>: Headers in <code>libpng</code> root directory and libs in <code>\projects\vstudio\x64\Release</code>.</p></li>
+<li><p>Install boost. As a lucky Windows guy, you don’t have to waste your time compiling the cumbersome boos(hi)t library since kind-hearted people have already prebuilt that for you. Instead, you just stare at the screen waiting for the painfully slow download of <code>boost_1_58_0-msvc-12.0-64.exe</code> from <a href="https://sourceforge.net/projects/boost/files/boost-binaries/1.58.0/" class="uri">https://sourceforge.net/projects/boost/files/boost-binaries/1.58.0/</a> to finish. After installation you might be impressed by those uncountable <code>boost_*-vc*-*-1_58.lib/dll</code> files flooding in your <code>boost_1_58_0\lib64-msvc-12.0</code> directory. But don’t panic, as a lucky Visual Studio guy, your compiler is smart enough to automatically pick one when necessary.</p></li>
+<li><p>Now utilize <code>mklink</code> to aggregate dependent headers and libs. Here is the batch script <code>makeLinks.bat</code>:</p>
+<pre><code>@echo off
+SET root=&quot;path\to\partapp-r2&quot;
+
+pushd %cd%
+pushd %root%
+
+mklink /D include_libpng &quot;D:\Bin\libpng\lpng1617&quot;
+mklink /D lib_libpng &quot;D:\Bin\libpng\lpng1617\projects\vstudio\x64\Release&quot;
+
+mklink /D include_boost &quot;D:\Bin\boost_1_58_0&quot;
+mklink /D lib_boost &quot;D:\Bin\boost_1_58_0\lib64-msvc-12.0&quot;
+
+mklink /D include_pb &quot;D:\Bin\protobuf-2.6.1\vsprojects\include&quot;
+mklink /D lib_pb &quot;D:\Bin\protobuf-2.6.1\vsprojects\x64\Release&quot;
+
+mklink /D include_mat &quot;D:\Program Files\MATLAB\R2010b\extern\include&quot;
+mklink /D lib_mat &quot;D:\Program Files\MATLAB\R2010b\extern\lib\win64\microsoft&quot;
+
+popd
+pause</code></pre>
+<p>Make some changes on the paths to suit your own needs. Run it as admin, and multiple <code>include_*</code> and <code>lib_*</code> folders will be created in <code>partapp-r2</code>.</p></li>
+<li><p>Several modifications should be made to the source code of <code>partapp-r2</code>. I detail them as follows. For the source code part, just compile <code>\src\libs</code> and fix the errors accordingly.</p>
+<ol type="1">
+<li><p>Run <code>protoc</code> for all <code>*.proto</code> files. It is also done by a batch file:</p>
+<pre><code>@echo off
+set root=&quot;path\to\partapp-r2\src\libs&quot;
+
+pushd %cd%
+pushd %root%
+
+for /F %%i in ('dir /b %root%') do (
+    pushd .\%%i
+    for /F %%j in ('dir /b *.proto') do (
+        echo Processing %%j
+        protoc --cpp_out=. %%j
+    )
+    popd
+)
+
+popd</code></pre></li>
+<li><p>Define <code>M_PI</code> constant whenever the compiler complains it is undefined:</p></li>
+</ol>
+<pre><code>const static double M_PI = 3.14159265358979323846264338327950288;</code></pre>
+<ol start="3" type="1">
+<li>Add <code>typedef unsigned int uint;</code> for the <code>uint</code>s spreading in the code;</li>
+<li><code>#include &lt;algorithm&gt;</code> for <code>std::max</code>, <code>std::min</code> etc.;</li>
+<li>Replace <code>bzero(_1, _2)</code> with <code>memset(_1, 0, _2)</code>;</li>
+<li>Use lambda functions instead of boost <code>bind</code>s, i.e., change</li>
+</ol>
+<pre><code>std::sort(v.begin(), v.end(),
+          bind(&amp;ObjectHypothesis::score, _1) &gt; bind(&amp;ObjectHypothesis::score, _2));</code></pre>
+<p>to <code>std::sort(v.begin(), v.end(),            [](const ObjectHypothesis&amp; a, const ObjectHypothesis&amp; b){               return a.score() &gt; b.score();            });</code></p>
+<p>And for the Qt project files,</p>
+<ol type="1">
+<li>Add <code>libpng.pri</code>. Use only relative paths in all <code>.pri</code> files as the symbolic links have already been created. For each <code>.pro</code> in subfolders, include corresponding <code>.pri</code> if necessary.</li>
+<li>In <code>begin.pri</code>, change <code>CONFIG += dll</code> to <code>CONFIG += static</code>. I encountered numerous linking errors and static linking worked fine for me.</li>
+<li>In <code>libs.pro</code>, add <code>CONFIG += ordered</code> and rearrange the order of <code>SUBDIRS</code> items.</li>
+<li>Do some cleanup.</li>
+</ol></li>
+<li><p>It is ready to build. For project <code>libs</code>, Right click =&gt; Run qmake, Build. Ignore the warnings. And for project <code>apps</code>, Right click =&gt; Run qmake, Build.</p></li>
+<li><p>After all these tedious work, we finally obtain the executable. But in order to make it runnable, the following steps have to be done:</p>
+<ol type="1">
+<li>Add Matlab binaries (e.g. <code>D:\Program Files\MATLAB\R2010b\bin\win64</code>) and Qt binaries (e.g. <code>D:\Bin\Qt\Qt5.4.2\5.4\msvc2013_64_opengl\bin</code>) to PATH variable.</li>
+<li>Copy <code>zlib1.dll</code> and <code>libpng16.dll</code> to <code>partapp-r2\bin\Release</code>.</li>
+</ol></li>
+</ol>
+<p>Now <code>partapp-r2\bin\Release\partapp.exe</code> should be able to run. Just test it according to 3rd and 4th instructions in <code>partapp-r2\README.txt</code>. I’ve uploaded <a href="../src.zip">src.zip</a> here. (What? You have done all the steps above yourself?) Just replace the <code>src</code> directory of the original code with it.</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

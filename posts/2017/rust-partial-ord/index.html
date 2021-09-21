@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - Rust中的偏序关系</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>Rust中的偏序关系</h1>
+            <div class="info">
+    Posted on December 16, 2017
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>Rust 是为数不多的几种严格区分全序关系与偏序关系的语言之一。这一点甚至连 Haskell 这样追求理论严谨性的学院派都没有做到。当然，代价是稍微损失了易用性，比如 Rust 中常被吐槽的浮点数集合求最值问题—— 因为 <code>max</code>/<code>min</code> 只对符合全序关系的类型才有意义，对于浮点数来说，“几乎处处”符合全序关系，但无可奈何的是浮点数中还有 NaN 这样的奇葩： NaN ≠ NaN，因此自反性不成立，从而浮点数就不符合 <code>PartialOrd</code> trait， <code>max</code>/<code>min</code>/<code>sort</code>/<code>BTreeMap</code> 统统不让用！一些 Rust 用户刚刚从与 borrow checker 的缠斗中脱身，就遭遇了浮点数的第二重打击，于是感觉受到了迫害，甚至用“宗教狂热”(religiosity) 这样的词来描述该特性。其实这么设计是和减少未定义行为的理念一脉相承的。下面就结合 Rust 的实现，来梳理一下 “≤”，“&lt;”，“≥”，“&gt;” 关系四元组，以及 <code>PartialEq</code>, <code>Eq</code>, <code>PartialOrd</code>, <code>Ord</code> 四个相关 trait 的来龙去脉。</p>
+<h2 id="部分等价关系partialeq">部分等价关系（<code>PartialEq</code>）</h2>
+<p>部分等价关系具有两个性质：</p>
+<ul>
+<li>Symmetry: a ~ b ⇒ b ~ a</li>
+<li>Transitivity: a ~ b ∧ b ~ c ⇒ a ~ c</li>
+</ul>
+<p>Rust 中的 <code>PartialEq</code> trait 定义了 <code>fn eq(&amp;self, other: &amp;Rhs) -&gt; bool</code> 和 <code>fn ne(&amp;self, other: &amp;Rhs) -&gt; bool</code> 两个函数，其中 <code>ne</code> 的默认实现是 <code>!self.eq(other)</code>。</p>
+<h2 id="等价关系eq">等价关系（<code>Eq</code>）</h2>
+<p>即：部分等价关系加上：</p>
+<ul>
+<li>Reflexivity: ∀a ∈ S ⇒ a ~ a</li>
+</ul>
+<p>在 Rust 中 <code>Eq</code> 只有一个空定义:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode rust"><code class="sourceCode rust"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">pub</span> <span class="kw">trait</span> <span class="bu">Eq</span><span class="op">:</span> <span class="bu">PartialEq</span><span class="op">&lt;</span><span class="dt">Self</span><span class="op">&gt;</span> <span class="op">{</span> <span class="op">}</span></span></code></pre></div>
+<p>这表明 <code>Eq</code> 只是一个编译器标识，正确性要由类型的实现者来保证。</p>
+<h2 id="偏序关系-与-partialord">偏序关系 与 <code>PartialOrd</code></h2>
+<p>偏序关系可以分成严格偏序与非严格偏序。二者的共同性质是：</p>
+<ul>
+<li>Antisymmetry: a ~ b ∧ b ~ a ⇔ a = b （或者等价地，a ~ b ⇒ ¬(b ~ a)）</li>
+<li>Transitivity: a ~ b ∧ b ~ c ⇒ a ~ c</li>
+</ul>
+<p>区别在于非严格偏序（Non-strict partial order） 是自反的：∀a ∈ S ⇒ a ~ a，可以用“≤”表示；而严格偏序（Strict partial order）是反自反的：∀a ∈ S ⇒ ¬(a ~ a)，可以用“&lt;”表示。二者的关系 Wikipedia 上解释得很清楚了： “Strict and non-strict partial orders are closely related. A non-strict partial order may be converted to a strict partial order by removing all relationships of the form a ≤ a. Conversely, a strict partial order may be converted to a non-strict partial order by adjoining all relationships of that form.” 然后再引入 <a href="https://en.wikipedia.org/wiki/Inverse_relation">逆关系</a> 这个概念，即 a ~ b ⇔ b inverse(~) a，那么有“≤”和“≥”互为逆关系，“&lt;”和“&gt;”互为逆关系。进一步地， “<strong>Any one of the four relations ≤, &lt;, ≥, and &gt; on a given set uniquely determines the other three.</strong>”</p>
+<p>看一下 Rust 中 <code>PartialOrd</code> 的定义：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode rust"><code class="sourceCode rust"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">pub</span> <span class="kw">trait</span> <span class="bu">PartialOrd</span><span class="op">&lt;</span>Rhs <span class="op">=</span> <span class="dt">Self</span><span class="op">&gt;:</span> <span class="bu">PartialEq</span><span class="op">&lt;</span>Rhs<span class="op">&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a><span class="kw">where</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>    Rhs<span class="op">:</span> <span class="op">?</span><span class="bu">Sized</span><span class="op">,</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a><span class="op">{</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>    <span class="kw">fn</span> partial_cmp(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> other<span class="op">:</span> <span class="op">&amp;</span>Rhs) <span class="op">-&gt;</span> <span class="dt">Option</span><span class="op">&lt;</span>Ordering<span class="op">&gt;;</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>    <span class="kw">fn</span> lt(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> other<span class="op">:</span> <span class="op">&amp;</span>Rhs) <span class="op">-&gt;</span> <span class="dt">bool</span> <span class="op">{</span> <span class="op">...</span> <span class="op">}</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>    <span class="kw">fn</span> le(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> other<span class="op">:</span> <span class="op">&amp;</span>Rhs) <span class="op">-&gt;</span> <span class="dt">bool</span> <span class="op">{</span> <span class="op">...</span> <span class="op">}</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>    <span class="kw">fn</span> gt(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> other<span class="op">:</span> <span class="op">&amp;</span>Rhs) <span class="op">-&gt;</span> <span class="dt">bool</span> <span class="op">{</span> <span class="op">...</span> <span class="op">}</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>    <span class="kw">fn</span> ge(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> other<span class="op">:</span> <span class="op">&amp;</span>Rhs) <span class="op">-&gt;</span> <span class="dt">bool</span> <span class="op">{</span> <span class="op">...</span> <span class="op">}</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a><span class="op">}</span></span></code></pre></div>
+<p>可以发现，<code>PartialOrd</code> 必须满足 <code>PartialEq</code>，而 <code>le</code> 和 <code>ge</code> 函数中的 <code>eq</code> 就由 <code>PartialEq</code> 的实现来提供。这和数学上的定义不同，这是怎么回事呢？事实上，Rust 的 <code>PartialOrd</code> 等价于下面三者的集合：</p>
+<ol type="1">
+<li>一个严格偏序关系（<code>&lt;</code>）</li>
+<li><code>PartialEq</code></li>
+<li>另一个严格偏序关系 <code>inverse(&lt;)</code>，即 <code>&gt;</code></li>
+</ol>
+<p>也就是一对逆关系和一个部分等价关系。</p>
+<h2 id="全序关系-与-ord">全序关系 与 <code>Ord</code></h2>
+<p>全序关系和偏序关系类似，也分成 strict 和 non-strict 两种。Non-strict total order 的性质：</p>
+<ul>
+<li>Antisymmetry: 同上</li>
+<li>Transitivity: 同上</li>
+<li>Totality: a ~ b 或 b ~ a 二者之一必须成立
+<ul>
+<li><strong>Totality also implies reflexivity</strong>, 即有 a ~ a，隐含地自反性成立。</li>
+</ul></li>
+</ul>
+<p>对于每个 non-strict total order 关系 “≤” 都存在一个 <strong>asymmetric</strong> 的 strict total order “&lt;”，可以由下面两种方式之一定义：</p>
+<ol type="1">
+<li>a &lt; b ⇔ a ≤ b ∧ a ≠ b</li>
+<li>a &lt; b ⇔ ¬(b ≤ a)</li>
+</ol>
+<p>注意，这个关系的性质是 Asymmetry，即 a ~ b ⇒ ¬(b ~ a)，和 Antisymmetry 不是一回事。 Asymmetry 同时隐含地表示<strong>反</strong>自反性成立。</p>
+<p>上面是从 “≤” 导出 “&lt;”，当然这个定义也可以反方向地进行。如果先有 “&lt;” 再有 “≤”，totality 就要改成 trichotomy (三元) 的形式，即以下三者之一必须为真：</p>
+<ul>
+<li>a ~ b</li>
+<li>b ~ a</li>
+<li>a = b</li>
+</ul>
+<p>（或者等价地，a ≠ b ⇒ a ~ b ∨ b ~ a）</p>
+<p>然后，再加上下面两条约束之一：</p>
+<ol type="1">
+<li>a ≤ b ⇔ a ≠ b ∧ a = b</li>
+<li>a ≤ b ⇔ ¬(b &lt; a)</li>
+</ol>
+<h3 id="rust-中的-ord-定义">Rust 中的 <code>Ord</code> 定义：</h3>
+<div class="sourceCode" id="cb3"><pre class="sourceCode rust"><code class="sourceCode rust"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="kw">pub</span> <span class="kw">trait</span> <span class="bu">Ord</span><span class="op">:</span> <span class="bu">Eq</span> <span class="op">+</span> <span class="bu">PartialOrd</span><span class="op">&lt;</span><span class="dt">Self</span><span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>    <span class="kw">fn</span> cmp(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> other<span class="op">:</span> <span class="op">&amp;</span><span class="dt">Self</span>) <span class="op">-&gt;</span> Ordering<span class="op">;</span></span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>    <span class="kw">fn</span> max(<span class="kw">self</span><span class="op">,</span> other<span class="op">:</span> <span class="dt">Self</span>) <span class="op">-&gt;</span> <span class="dt">Self</span> <span class="op">{</span> <span class="op">...</span> <span class="op">}</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>    <span class="kw">fn</span> min(<span class="kw">self</span><span class="op">,</span> other<span class="op">:</span> <span class="dt">Self</span>) <span class="op">-&gt;</span> <span class="dt">Self</span> <span class="op">{</span> <span class="op">...</span> <span class="op">}</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a><span class="op">}</span></span></code></pre></div>
+<p>满足 <code>Ord</code> 的类型必须满足 <code>Eq</code> 和 <code>PartialOrd</code>，从而也必须满足 <code>PartialEq</code>，因为 <code>Eq</code> 和 <code>PartialOrd</code> 都要求满足 <code>PartialEq</code>。（这是一个菱形的约束关系。）</p>
+<h2 id="编程语言中的比较运算符">编程语言中的比较运算符</h2>
+<p>当 <code>&lt;</code> 作为一个程序的运算符出现的时候，就不再是数学上的严格偏序/全序关系了。因为缺少 totality 约束，任意 a b 不一定支持 <code>a &lt; b</code> 运算，所以 <code>&lt;</code> 应该定义成（以某种奇怪的伪代码表达）：</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode haskell"><code class="sourceCode haskell"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a>(<span class="op">&lt;</span>) <span class="op">:</span> <span class="dt">PartialOrd</span> a <span class="ot">=&gt;</span> a <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> <span class="dt">Bool</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>(<span class="op">&lt;</span>) l r <span class="ot">=</span> partialCmp l r <span class="op">==</span> <span class="dt">Some</span>(<span class="dt">Ordering</span><span class="ot">::</span><span class="dt">Less</span>)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a>partialCmp <span class="op">:</span> <span class="dt">PartialOrd</span> a <span class="ot">=&gt;</span> a <span class="ot">-&gt;</span> a <span class="ot">-&gt;</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="dt">Ordering</span><span class="op">&gt;</span></span></code></pre></div>
+<p>看到这里我们可能会猜测浮点数的 <code>partialCmp</code> 实现差不多应该是 <code>partialCmp NaN _ = None</code> 这类形式，但是对照一下 Rust 中 <code>f32</code>/<code>f64</code> 的 <code>PartialOrd</code> 实现，当时我就震惊了：</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode rust"><code class="sourceCode rust"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="co">// 这是从宏定义中提取的，所以有 `$t` 符号</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a><span class="kw">fn</span> partial_cmp(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> other<span class="op">:</span> <span class="op">&amp;$</span>t) <span class="op">-&gt;</span> <span class="dt">Option</span><span class="op">&lt;</span>Ordering<span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a>    <span class="kw">match</span> (<span class="kw">self</span> <span class="op">&lt;=</span> other<span class="op">,</span> <span class="kw">self</span> <span class="op">&gt;=</span> other) <span class="op">{</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a>        (<span class="cn">false</span><span class="op">,</span> <span class="cn">false</span>) <span class="op">=&gt;</span> <span class="cn">None</span><span class="op">,</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a>        (<span class="cn">false</span><span class="op">,</span> <span class="cn">true</span>) <span class="op">=&gt;</span> <span class="cn">Some</span>(Greater)<span class="op">,</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true"></a>        (<span class="cn">true</span><span class="op">,</span> <span class="cn">false</span>) <span class="op">=&gt;</span> <span class="cn">Some</span>(Less)<span class="op">,</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a>        (<span class="cn">true</span><span class="op">,</span> <span class="cn">true</span>) <span class="op">=&gt;</span> <span class="cn">Some</span>(Equal)<span class="op">,</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a>    <span class="op">}</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true"></a><span class="op">}</span></span></code></pre></div>
+<p>竟然先有 <code>&lt;=</code> 再有 <code>partial_cmp</code>！但是按上面的分析 <code>partial_cmp</code> 不应该在 <code>&lt;</code> 之前吗？</p>
+<p>其实，这里的 <code>&lt;=</code> 和 <code>&gt;=</code> 都是 compiler intrinsics（编译器提供的底层原语），对浮点数来说，一般可以理解成这些调用直接映射到 IEEE 754 的汇编指令/硬件实现。当然，上面的实现应用了一点小技巧，隐式解决了几种边界情况。</p>
+<p>最后补充一下，在忽略 NaN 这种奇点的情况下如何让 Rust 的 <code>f32</code>/<code>f64</code> 支持 <code>Ord</code>。主要解决办法有：</p>
+<ol type="1">
+<li>利用 Rust zero-cost newtype 直接包装一个 <code>OrderedFloat(f32)</code>，自定义比较运算，比如 <a href="https://github.com/reem/rust-ordered-float">rust-ordered-float</a>。在 IEEE 754 中除了通常的比较运算外还额外规定了一个 <a href="https://en.wikipedia.org/wiki/IEEE_754#Total-ordering_predicate">Total-ordering predicate</a>，增加了-0 &lt; +0, -NaN &lt; -Inf, +Inf &lt; +NaN 等规则，遵守这个官方规则来定义较好。</li>
+<li><code>f32</code>/<code>f64</code> 在内存里也就是一段字节数组对不对？所以可以自定义字典序， <code>std::mem::transmute</code> 成 <code>[u8]</code> 比较。有时候我们更关心一个明确的顺序而不是数学意义上的大小，比如写一个分数结构有可能会希望 2/4 不等于 1/2，改用字典序就是合理的。</li>
+<li>还有一个 <a href="https://docs.rs/noisy_float/">noisy_float</a> crate，在构造器中限制传入 NaN，直接把 NaN 开除出浮点数集，不失为一种简单粗暴但是管用的办法。</li>
+</ol>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>
