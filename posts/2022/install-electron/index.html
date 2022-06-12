@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="Programming blog">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 如何在局域网手动安装Electron</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>如何在局域网手动安装Electron</h1>
+            <div class="info">
+    Posted on June 18, 2022
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>在<del>某天八小时</del>某个星期996之外的闲暇时间里，你，一个职级高达 P6 的前端程序员，忽然想要编译公司的一个基于 Electron 的桌面端项目。命令行敲下 <code>yarn</code> 加回车，三分钟之后，却发现界面仍然停留在等待状态：</p>
+<pre><code>Building fresh packages...
+. electron
+. waiting
+. waiting</code></pre>
+<p>看来需要切换到连接更稳定的镜像站点，或者通过代理加速。于是你打开 <code>~/.yarnrc</code> 配置文件，加入以下设置：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="co"># 镜像</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a><span class="ex">registry</span> <span class="st">&quot;https://registry.npmmirror.com&quot;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a><span class="va">ELECTRON_MIRROR=</span><span class="st">&quot;https://npmmirror.com/mirrors/electron/&quot;</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a><span class="co"># 代理</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a><span class="ex">httpProxy</span> <span class="st">&quot;http://127.0.0.1:2082&quot;</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a><span class="ex">httpsProxy</span> <span class="st">&quot;http://127.0.0.1:2082&quot;</span></span></code></pre></div>
+<p>重试一下，还是卡在刚才那一步。猜测和某些无效缓存有关，于是你执行 <code>yarn cache clean</code> 清除缓存再次安装，可是一样不行。只好 <code>yarn global add electron</code> 并加上 <code>--verbose</code> 参数单独测试 Electron，看到报出错误 <code>RequestError: read ECONNRESET</code>，可以确认是网络连接问题，可是不知道如何修复。在绝望中你做出最后的挣扎，逐行阅读 node 和代理软件的日志，想找出一点蛛丝马迹…</p>
+<p>真是太让人抓狂了！这时候你才终于想起来原来自己身处局域网，手动安装是唯一的选择。</p>
+<hr />
+<p>以上场景相信每个局域网程序员都不会陌生。那么如何在局域网环境下像谷爱凌一样自由的安装 Electron 呢？操作步骤如下：</p>
+<ol type="1">
+<li>打开 <code>.\node_modules\@electron\get\dist\cjs\Cache.js</code> 文件，编辑 <code>getCachePath</code> 函数，把它的返回值用 <code>console.log</code> 打出。</li>
+<li>通过任意非局域连网方法下载 Electron 安装包，放在上一步输出的路径。（比如我就把 <code>electron-v19.0.1-win32-x64.zip</code> 放在 <code>%LocalAppData%\electron\Cache\365cd68ae7ffb912dbc93de86e2e6a5ecf7cfee48964b7291db4a4083a2d7f98\</code> 目录下）</li>
+<li>执行 <code>yarn</code>，现在可以成功编译了。</li>
+</ol>
+<p>是的，就是这么简单！但如果你不了解这个小技巧，可能会在安装 Electron 上消耗很长时间，也根本没有心情写代码了。所以说局域网的存在自动淘汰了一批电脑操作不熟练的程序员，间接提高了国产软件的质量。写到这里，我忽然明白了国家的良苦用心。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

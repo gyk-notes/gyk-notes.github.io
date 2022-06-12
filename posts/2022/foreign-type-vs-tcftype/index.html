@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="Programming blog">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - foreign_types 与 TCFType</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>foreign_types 与 TCFType</h1>
+            <div class="info">
+    Posted on August 13, 2022
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>用 Rust 做 macOS 系统开发时，对原生 C 类型的包装主要有两种方式： <a href="https://docs.rs/foreign-types/latest/foreign_types/"><code>foreign_types</code></a> 和 <a href="https://docs.rs/core-foundation/latest/core_foundation/base/trait.TCFType.html"><code>TCFType</code></a>。 <code>TCFType</code> 在 core-foundation crate 中定义，因此 core-foundation 本身和与其关系密切的 core-services 等库都用 <code>TCFType</code>，但是屏幕绘图相关的 core-graphics 却采用了 <code>foreign_types</code>。更加引起混乱的是，core-graphics 也有一部分代码用的是 <code>TCFType</code>，而且它目前依赖的 <code>foreign_types</code> 是 v0.3 而非最新的 v0.5。在我隔了很长时间重新开始 macOS Rust 开发的时候，这些不一致的地方总会对再次上手造成一点困扰。</p>
+<p>这两个库的主要区别在于：</p>
+<ol type="1">
+<li><p><code>foreign_types</code> 是一个用 Rust 类型系统来表达 C 对象所有权的通用解决方案；<code>TCFType</code> 则提供专用于 Core Foundation 的方案，因此包含了一些特有的支持，比如 drop 时统一调用 <code>CFRelease</code>，无需像 <code>foreign_types</code> 那样指定 drop 函数；<code>wrap_under_create_rule</code> / <code>wrap_under_get_rule</code> 支持；转换成 <code>CFType</code> 基类的方法；以及提供了获取 TypeID 的接口等等。</p></li>
+<li><p><code>foreign_types</code> 对于类型系统的应用更加严谨，比如把 sys 类型定义成空 enum，Ref 类型设计成 <code>Opaque</code> 的 newtype 等，二者都无法被创建。<code>TCFType</code> 的做法比较简单，sys 类型是名字以双下划线开头的 <code>c_void</code> newtype 或空 struct，Ref 类型则只是对应 sys 类型指针的 type alias，而包装类型则是 Ref 类型的 newtype —— 这三种类型本身并不禁止创建，还需要通过模块级别的访问限制加以保护。又比如 <code>foreign_types</code> 对于空指针是通过 <code>NonNull</code> 类型来约束，而 <code>TCFType</code> 是在构造函数中检查。</p></li>
+<li><p><code>TCFType</code> 那些引用计数相关的功能提供了更多的灵活性，也更忠实的映射了原生类型。<code>foreign_types</code> 没有等价于 <code>wrap_under_get_rule</code> 的方法，会影响个别函数的使用，这个问题之前<a href="https://github.com/servo/core-foundation-rs/issues/466">遇到过一次</a>。</p></li>
+<li><p><code>TCFType</code> 转换成 <code>CFType</code> 的功能也可以提供额外的类型安全。一个例子是用 <code>CFDictionary::from_CFType_pairs</code> 创建字典，如果 value 的具体类型不统一，仍然可以选择通用的 <code>CFType</code> 而不是 void 指针。</p></li>
+</ol>
+<p>其实我也不太了解为什么同处一个 Git repo 的 core-foundation 和 core-graphics 没有统一选择 <code>TCFType</code>，也许是 Mozilla 人力有限没时间去重构，而 Apple 又不像 Microsoft 和 Amazon 那样关心 Rust 生态吧。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>
