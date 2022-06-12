@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="Programming blog">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - Sublime-Text-like Fuzzy Query in Tantivy</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>Sublime-Text-like Fuzzy Query in Tantivy</h1>
+            <div class="info">
+    Posted on March 26, 2022
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<h2 id="motivation">Motivation</h2>
+<p>When I first tried Sublime Text years ago, the feature I found most remarkable was “Goto Anything”. Working blazingly fast, it was especially suitable for searching a large collection of short text (e.g., the names of files, variables, commands, etc.) for the most relevant ones. I later learned that it along with Auto Completion was enabled by the Fuzzy Search algorithm under the hood.</p>
+<p>This fuzzy search is basically subsequence match on steroid: It only filters in the candidates which the query string is a subsequence of, in addition, word starts and consecutive matches are given extra bonus, making it both convenient (by saving some key strokes) and intuitive (by aligning well with cognitive process) to use. Although can be dated back to TextMate and Quicksilver, its usage in productivity tools only gains much popularity since the launch of Sublime Text 2. So like others, I would just call it “Sublime-Text-like fuzzy search” in this post.</p>
+<p>Many people (not necesssarily programmers) wish they could search text in this way everywhere. So naturally, our team would like to bring the users of our digital asset management tool with this kind of fuzzy search. In our desktop DAM application, we provide an omnibox for the users to easily and quickly search through millions of assets based on their file names, tags, comments and other metadata.</p>
+<p>The searching in our application is powered by <a href="https://github.com/quickwit-oss/tantivy">Tantivy</a>, the Rust lang’s Lucene equivalent. Tantivy is already feature-rich, but unfortunately its builtin <a href="https://docs.rs/tantivy/0.17.0/tantivy/query/struct.FuzzyTermQuery.html">fuzzy query</a> is not exactly what we want.</p>
+<p>There is a relevant (and unresolved) GitHub issue <a href="https://github.com/quickwit-oss/tantivy/issues/219">Implementing a Sublime-style fuzzy search</a>, and I find <a href="https://github.com/quickwit-oss/tantivy/issues/219#issuecomment-532360998">this reply</a> from <span class="citation" data-cites="petr-tik">@petr-tik</span> insightful, despite being inaccurate in details.</p>
+<p>I decided to follow <span class="citation" data-cites="petr-tik">@petr-tik</span>’s design initially, but found its shortages soon after:</p>
+<ol type="1">
+<li><p>The <code>Subsequence</code> automaton can be very slow to execute. A subsequence of <code>abc</code> is effectively a RegEx of <code>.*a.*b.*c.*</code>, and the major culprit for the slowness is the leading wildcard <code>.*</code>. As <code>fst-regex</code>’s documentation puts it:</p>
+<blockquote>
+<p>Caution: Starting a regular expression with <code>.*</code> means that it could potentially match any key in a finite state transducer. This implies that all keys could be visited, which could be slow.</p>
+</blockquote></li>
+<li><p>The default implementation of <code>Subsequence</code> is case sensitive, however, the users commonly expect to search in a case-insensitive way.</p></li>
+</ol>
+<p>In the GitHub comment linked above, the original author was apparently aware of the first point (see the “Possible mitigations” part) and provided his workaround. But my approach had being gradually diverging to address these issues.</p>
+<h2 id="the-suffixtokenizer">The <code>SuffixTokenizer</code></h2>
+<p>One nice thing about Tantivy’s term dictionary storage is the underlying FST data structure being powerful and scalable. Thinking of it as something like suffix tree: The tokens share a substantial part inside the automaton, hence it’s very space efficient.</p>
+<p>My solution makes a trade-off between <em>recall</em> and speed: The matched text must contain at least one word that starts with the first letter of the user’s query. In this way, “trust” will not be found if “rust” is requested. But it still makes sense: The first letter does play a greater role in word recognition and is worth emphasizing when you query it.</p>
+<p>The basic idea is, we just “unfold” (in the jargon of functional programming) the original text into a sequence of its suffixes — Suffixes that start at <strong>word</strong> boundaries. Thus, an input text of <em>N</em> words will be turned into <em>N</em> suffixes. Then considering we only care about the presence of first letters, duplicate ones are ignored. So the suffixes of “Bad to the Bone” become <code>["Bad to the Bone", "to the Bone"]</code>. As a result, the text will be turned into at most 26 suffixes (your alphabet may vary), and after the very first transition of the automaton, the number of candidates can be significantly reduced.</p>
+<p>For easier integration with other Tantivy components, I chose to put the logic into the tokenizing step of the indexing pipeline. Our specific tokenizer, boringly named <code>SuffixTokenizer</code>, takes the input text and generates a sequence of suffixes of potentially meaningful phrases.</p>
+<p>Take the book title “Building RESTful Web Services with Spring 5” as an example. It will be tokenized to (comments in parentheses):</p>
+<ul>
+<li><code>"Building RESTful Web Services with Spring 5"</code> (Always generate the entire text)</li>
+<li><code>"RESTful Web Services with Spring 5"</code></li>
+<li><code>"Tful Web Services with Spring 5"</code> (Without an English dictionary, it’s impossible to tell “Tful” is not a word)</li>
+<li><code>"Web Services with Spring 5"</code></li>
+<li><code>"Services with Spring 5"</code></li>
+<li>(As we have already generated suffixes starting with letter “W” and “S”, “with Spring 5” and “Spring 5” are not produced. Reaches the end of token stream.)</li>
+</ul>
+<p>Now suppose the user types “restws” in the search bar. <code>Subsequence</code> will convert the query into its RegEx counterpart <code>(?i)^r.*e.*s.*t.*w.*s.*</code>, and call into Tantivy’s <code>TermDictionary::search</code> to get the term stream which, in this specific example, contains only one item “RESTful Web Services with Spring 5”.</p>
+<p>Eventually, the score from invoking <code>sublime_fuzzy::best_match("restws", "RESTful Web Services with Spring 5")</code> will be returned.</p>
+<h2 id="other-technical-details">Other technical details</h2>
+<p>Tantivy requires contiguous doc IDs (the contract is encoded in the <code>DocSet</code> trait) for bitpacking the numbers more compactly. Each <code>Term</code>’s <code>SegmentPostings</code> obtained from <code>InvertedIndexReader::read_postings_from_terminfo</code> has already implemented <code>DocSet</code>, but our Sublime-Text-like <code>FuzzyQuery</code> have to return a scorer (recall that <code>trait Scorer: DocSet</code>) for the whole segment:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode rust"><code class="sourceCode rust"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">impl</span> Query <span class="kw">for</span> SublimeFuzzyQuery <span class="op">{</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>    <span class="kw">fn</span> weight(</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>        <span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>        _searcher<span class="op">:</span> <span class="op">&amp;</span>Searcher<span class="op">,</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>        _scoring_enabled<span class="op">:</span> <span class="dt">bool</span><span class="op">,</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>    ) <span class="op">-&gt;</span> <span class="pp">tantivy::</span><span class="dt">Result</span><span class="op">&lt;</span><span class="dt">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> Weight<span class="op">&gt;&gt;</span> <span class="op">{</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>        <span class="cn">Ok</span>(<span class="dt">Box</span><span class="pp">::</span>new(FuzzyWeight <span class="op">{</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>            <span class="co">// Removed for brevity</span></span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>        <span class="op">}</span>))</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>    <span class="op">}</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a><span class="op">}</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a><span class="kw">impl</span> Weight <span class="kw">for</span> FuzzyWeight <span class="op">{</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>    <span class="kw">fn</span> scorer(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> reader<span class="op">:</span> <span class="op">&amp;</span>SegmentReader<span class="op">,</span> boost<span class="op">:</span> Score) <span class="op">-&gt;</span> <span class="pp">tantivy::</span><span class="dt">Result</span><span class="op">&lt;</span><span class="dt">Box</span><span class="op">&lt;</span><span class="kw">dyn</span> Scorer<span class="op">&gt;&gt;</span> <span class="op">{</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a>        <span class="pp">todo!</span>()</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a>    <span class="op">}</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a><span class="op">}</span></span></code></pre></div>
+<p>So we need to roll our own facility to output ordered docs. Something like heap sort should work fine.</p>
+<p>I also patched fst’s <code>Subsequence</code> to make it case-insensitive and mandate the input to match the first character.</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode rust"><code class="sourceCode rust"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="at">#[</span>inline<span class="at">]</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a><span class="kw">fn</span> accept(<span class="op">&amp;</span><span class="kw">self</span><span class="op">,</span> <span class="op">&amp;</span>state<span class="op">:</span> <span class="op">&amp;</span><span class="dt">Option</span><span class="op">&lt;</span><span class="dt">usize</span><span class="op">&gt;,</span> byte<span class="op">:</span> <span class="dt">u8</span>) <span class="op">-&gt;</span> <span class="dt">Option</span><span class="op">&lt;</span><span class="dt">usize</span><span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>    <span class="kw">match</span> state <span class="op">{</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>        <span class="cn">Some</span>(n) <span class="kw">if</span> n <span class="op">==</span> <span class="kw">self</span><span class="op">.</span>subseq<span class="op">.</span>len() <span class="op">=&gt;</span> state<span class="op">,</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>        <span class="cn">Some</span>(<span class="dv">0</span>) <span class="op">=&gt;</span> <span class="op">{</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>            <span class="kw">if</span> byte<span class="op">.</span>eq_ignore_ascii_case(<span class="op">&amp;</span><span class="kw">self</span><span class="op">.</span>subseq[<span class="dv">0</span>]) <span class="op">{</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>                <span class="cn">Some</span>(<span class="dv">1</span>)</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>            <span class="op">}</span> <span class="kw">else</span> <span class="op">{</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>                <span class="cn">None</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>            <span class="op">}</span></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a>        <span class="op">}</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a>        <span class="cn">Some</span>(n) <span class="op">=&gt;</span> <span class="cn">Some</span>(n <span class="op">+</span> (byte<span class="op">.</span>eq_ignore_ascii_case(<span class="op">&amp;</span><span class="kw">self</span><span class="op">.</span>subseq[n])) <span class="kw">as</span> <span class="dt">usize</span>)<span class="op">,</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a>        <span class="cn">None</span> <span class="op">=&gt;</span> <span class="cn">None</span><span class="op">,</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a>    <span class="op">}</span></span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true"></a><span class="op">}</span></span></code></pre></div>
+<h2 id="the-fruit">The “fruit”</h2>
+<p>In Tantivy, <code>Fruit</code> refers to the data being harvested by its <code>Collector</code>. Here “fruit” means the final result of our solution.</p>
+<p>Performance-wise, this approach avoids using the costly leading wildcard, and is able to filter out file names where none of the suffixes shares the first letter with the user input. Thanks to FST, it also does not add too much burden to the term dictionary. In our benchmark on a large dataset, the searching time is reduced from more than 2s to less than 500ms. If you Google “Google” in Google, it takes more than 500ms. So I would count the delay as “responsive”.</p>
+<p>Another thing to consider: A lot of fuzzy search implementations are susceptible to <a href="https://www.regular-expressions.info/catastrophic.html">catastrophic backtracking</a>. Tantivy’s <a href="https://docs.rs/tantivy/0.16.1/tantivy/tokenizer/index.html#default">default tokenizer</a> trims text to 40 characters. If yours doesn’t, beware of this performance pitfall.</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>
