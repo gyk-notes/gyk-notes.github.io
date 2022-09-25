@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="Programming blog">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - A Failed Attemp to Reinvent Hook Wrapper in Clojure</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>A Failed Attemp to Reinvent Hook Wrapper in Clojure</h1>
+            <div class="info">
+    Posted on September 11, 2022
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>When working with ClojureScript, incorporating state hooks into your React app comes in 3 flavors:</p>
+<ol type="1">
+<li><p>The same as in JavaScript:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>(<span class="kw">let</span> [[state set-state] (use-state initial)]</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>  (do-something state)</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>  (set-state new-value))</span></code></pre></div>
+<p><code>use-state</code> is simply mapped to React’s native <code>useState</code>, optionally with <a href="https://github.com/lilactown/helix/blob/0.1.7/src/helix/hooks.cljc#L53">some adaptation</a> for easier use in Clojure.</p></li>
+<li><p>Passing an Atom as the intial value:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a>(<span class="bu">defonce</span><span class="fu"> my-state </span>(<span class="kw">atom</span> initial))</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>(<span class="kw">let</span> [state (use-state my-state)]</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>  (do-something state)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>  (<span class="kw">swap!</span> my-state f arg))</span></code></pre></div>
+<p>The implementation usually relies on the <a href="https://github.com/lilactown/hooks-demo/blob/master/src/hooks_demo/hooks.cljs#L24">watcher</a> of Atom. It requires separately managing the atom along with the returned state on the caller side, which does feel a bit tedious.</p></li>
+<li><p>With the good-old Clojure Atom interface:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a>(<span class="kw">let</span> [state (use-state initial)]</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>  (do-something <span class="at">@state</span>)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>  (<span class="kw">swap!</span> state f arg))</span></code></pre></div>
+<p>The <code>state</code> returned is an Atom-like object, so you can just manipulate it with <code>reset!</code>, <code>swap!</code>, etc. This is arguably the most familiar way to Clojure developers.</p></li>
+</ol>
+<p>Each approach comes with its pros and cons. Notably, <a href="https://github.com/roman01la/uix">UIx</a> uses the 3rd approach while <a href="https://github.com/lilactown/helix">Helix</a> uses the 1st one.</p>
+<p>At my day job, when our team made the decision to switch from UIx to Helix, some colleagues added a custom <code>hooks</code> module to continuingly use the Atom-like hooks with Helix, so as to make the transition painless. But it was kind of funny that when I checked the code later, my first impression was the usage of <code>useMemo</code> hook looked a bit convoluted for me:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a>(<span class="bu">defn</span><span class="fu"> state </span>[value]</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>  <span class="pp">#?</span>(<span class="at">:cljs</span> (<span class="kw">let</span> [[value set-value] (r/useState value)</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a>                 sh (r/useMemo #(StateHook. value set-value) #js [])]</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true"></a>             (r/useMemo (<span class="kw">fn</span> []</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true"></a>                          (set! (.-value sh) value)</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true"></a>                          (set! (.-set-value sh) set-value)</span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true"></a>                          sh)</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true"></a>                        #js [value set-value]))</span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true"></a>     <span class="at">:clj</span> (<span class="kw">atom</span> value)))</span></code></pre></div>
+<p>Not one, but two <code>useMemo</code>s! The first call ensures <code>StateHook</code> is instantiated only once on mount, and the second call keeps these fields up to date with their JS counterparts. And I thought, ah, I could do it better. Based on the work of <a href="https://github.com/lilactown/hooks-demo/blob/master/src/hooks_demo/hooks.cljs">hooks-demo</a>, I wrote down my own version of <code>use-state</code>:</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="co">;; === State Hook for CLJS ===</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a>(<span class="bu">deftype</span><span class="fu"> StateHook </span>[^<span class="at">:unsynchronized-mutable</span> value set-value]</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a>  IDeref</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a>  (-deref [_]</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a>    value)</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a>  IReset</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a>  (-reset! [_ value']</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true"></a>    (set-value value')</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true"></a>    (set! value value')</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true"></a>    value')</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true"></a></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true"></a>  ISwap</span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true"></a>  (-swap! [o f]</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true"></a>    (-reset! o (f (-deref o))))</span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true"></a>  (-swap! [o f a]</span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true"></a>    (-reset! o (f (-deref o) a)))</span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true"></a>  (-swap! [o f a b]</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true"></a>    (-reset! o (f (-deref o) a b)))</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true"></a>  (-swap! [o f a b xs]</span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true"></a>    (-reset! o (<span class="kw">apply</span> f (-deref o) a b xs)))</span>
+<span id="cb5-22"><a href="#cb5-22" aria-hidden="true"></a></span>
+<span id="cb5-23"><a href="#cb5-23" aria-hidden="true"></a>  <span class="co">; Methods for other protocols removed for brevity.</span></span>
+<span id="cb5-24"><a href="#cb5-24" aria-hidden="true"></a>  )</span>
+<span id="cb5-25"><a href="#cb5-25" aria-hidden="true"></a></span>
+<span id="cb5-26"><a href="#cb5-26" aria-hidden="true"></a>(<span class="bu">defn</span><span class="fu"> use-state</span></span>
+<span id="cb5-27"><a href="#cb5-27" aria-hidden="true"></a>  [initial]</span>
+<span id="cb5-28"><a href="#cb5-28" aria-hidden="true"></a>  (<span class="kw">let</span> [[value set-value] (react/useState initial)]</span>
+<span id="cb5-29"><a href="#cb5-29" aria-hidden="true"></a>    (StateHook. value set-value)))</span></code></pre></div>
+<p>In Clojure’s <a href="https://clojuredocs.org/clojure.core/deftype">documentation</a>, it is advised that mutable fields should only be used if you are truly an expert. I consider myself no expert, and the semantics and implications of <code>^:unsynchronized-mutable</code> marked fields are not immediately apparent to me like a knee-jerk reaction, but, according to my test, it does work on both my pet project and our team’s mega one, and has yet caused any unfathomable bugs so far.</p>
+<p>Also note that (CL)JS is single-threaded, so you don’t really need <code>^:volatile-mutable</code> here. And there is a <code>^:mutable</code> tag which seems to work too, but I am not able to find it in the official documentation.</p>
+<p>That been said, the first code snippet above mutates the fields of JS objects as well, only in a more implicit way. And it creates “double memoizations” – one from React and the other at the CLJS side.</p>
+<p>It turned out our <code>hooks</code> module was directly borrowed from <a href="https://github.com/roman01la/uix/blob/master/core/src/uix/hooks/alpha.cljc"><code>uix.hooks.alpha</code></a> – which means it was actually written by ClojureScript expert <span class="citation" data-cites="roman01la">@roman01la</span> and under the scrutiny of even more experts, so it was impossible to go wrong.</p>
+<p>It also seemed to be evolved from an old version of <code>useState</code> wrapper written (also by <span class="citation" data-cites="roman01la">@roman01la</span>) in 2018. However, the old implementation did not work in all cases, because the <code>state</code> variable only gets updated whenever rerendering occurs. For example, if you refer to the state variable in a <code>js/setInterval</code> call, it might not work as expected when the timer ticks. (This kind of resembles the <a href="https://overreacted.io/making-setinterval-declarative-with-react-hooks/"><code>setInterval</code> problem</a> with React’s native hooks.) In essence, it does not preserve all the semantics of Atom. If you modify the Atom-like and read its value right after, it is still the old one. It has no read-your-writes consistency.</p>
+<p>When it comes to UIx’s hooks, I <em>know</em> it must be a better implementation, but for now I am not fully convinced. I still cannot wrap my head around the subtleties of the code, to understand why it is better than my attemp to reinvent a wrapper of React Hooks in Clojure <code>:(</code>.</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

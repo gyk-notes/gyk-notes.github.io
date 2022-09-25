@@ -46,7 +46,7 @@
 <ol type="1">
 <li>First-class type。学习函数式编程的时候会介绍的一个概念：函数和其他的值一样是“一等公民”，可以作为参数传入，或者返回值传出，即所谓的高阶函数。同理，在 DT 中类型也是一等公民，可以参与计算，也可以依赖其他的 <em>值</em>（而不仅仅是其他的类型），得到“高阶”类型。</li>
 <li>Curry–Howard correspondence，或 propositions as types。即“命题-类型同构”，也就是说我们可以把命题的逻辑编码在类型里，假如能构造出对应的类型，那就说明命题成立。</li>
-<li>接上一条，Algebraic data type（ML系语言中常见的类型系统）的一个重要意义就是建立有效状态和可合法构造类型的同构（等价的说，把无效状态表达成类型错误）。DT 更是把这一点发扬光大，能够把很多 bug 扼杀在编译期，并给 <em>类型驱动开发</em> 提供支持。</li>
+<li>接上一条，Algebraic data type（ML系语言中常见的类型系统）的一个重要意义就是建立有效状态和可合法构造类型的同构（等价的说，把无效状态表达成类型错误）。DT 更是把这一点发扬光大，能够把很多 bug 扼杀在编译期，并给 <em>类型驱动开发</em> 和 <em>Correctness by Construction</em> 提供支持。</li>
 </ol>
 <p>了解了第一点，就能看懂 <code>interpTy : Ty -&gt; Type</code> 这个声明就是把解释器内部的类型 <code>Ty</code> 转换成 Idris 的原生类型返回。了解二三点后会明白，这段代码的主要看点就是把 well-typed 这个判断编码在类型定义里，通过类型检查保证用户只能构造出类型正确的解释器输入。</p>
 <p>然后介绍一下 finite set。 Finite set 的作用是给出有上界的序数，比如要访问 n 个元素的向量 <code>Vect n a</code>，合法的下标范围是 <code>[0, n)</code>，因此 <code>index</code> 的声明是</p>

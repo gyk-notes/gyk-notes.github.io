@@ -60,6 +60,7 @@
 <p>以上场景相信每个局域网程序员都不会陌生。那么如何在局域网环境下像谷爱凌一样自由的安装 Electron 呢？操作步骤如下：</p>
 <ol type="1">
 <li>打开 <code>.\node_modules\@electron\get\dist\cjs\Cache.js</code> 文件，编辑 <code>getCachePath</code> 函数，把它的返回值用 <code>console.log</code> 打出。</li>
+<li>运行一下 <code>node .\node_modules\electron\install.js</code>，得到路径后退出。</li>
 <li>通过任意非局域连网方法下载 Electron 安装包，放在上一步输出的路径。（比如我就把 <code>electron-v19.0.1-win32-x64.zip</code> 放在 <code>%LocalAppData%\electron\Cache\365cd68ae7ffb912dbc93de86e2e6a5ecf7cfee48964b7291db4a4083a2d7f98\</code> 目录下）</li>
 <li>执行 <code>yarn</code>，现在可以成功编译了。</li>
 </ol>
