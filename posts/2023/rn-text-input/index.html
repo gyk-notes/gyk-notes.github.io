@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="A blog by Yukun Guo on programming">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Bingbot" content="nocache" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - React Native实现手机号格式化输入</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>React Native实现手机号格式化输入</h1>
+            <div class="info">
+    Posted on May 17, 2023
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>在开发移动 APP 的时候，对于注册和登录页面，我们通常会给用户输入的手机号插入分隔空格来增加可读性，比如 “15812341234” 就显示成 “158 1234 1234”。但在 React Native 中实现这个功能却不像想象的那么简单。这是因为 RN 的 <code>TextInput</code> 属于 controlled component，用户输入会马上反映到 native 控件上，但 React 的状态更新有滞后， <code>onChange</code> 或 <code>onChangeText</code> 事件处理文本后将再次刷新，这会带来肉眼可见的闪烁（flicker）。此外还有光标位置的更新问题，而且 iOS 和 Android 行为不同。</p>
+<p>先给出初始的版本：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>(<span class="kw">require</span> '[applied-science.js-interop <span class="at">:as</span> j])</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>(<span class="kw">require</span> '[helix.core <span class="at">:refer</span> [$ subscribe]])</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>(<span class="kw">require</span> '[re-frame.core <span class="at">:as</span> rf])</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>(defnc signup-form</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>  []</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>  (<span class="kw">let</span> [phone  (<span class="at">:phone</span> (subscribe [<span class="at">::form</span>]))</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>        phone* (hooks/use-state (prettify-phone phone))]</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>    ($ rn/text-input</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>      {<span class="at">:placeholder</span>  <span class="st">&quot;请输入手机号&quot;</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>       <span class="at">:inputMode</span>    <span class="st">&quot;tel&quot;</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>       <span class="at">:autoComplete</span> <span class="st">&quot;tel&quot;</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>       <span class="at">:value</span>        <span class="at">@phone*</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>       <span class="at">:onChangeText</span> (<span class="kw">fn</span> [text]</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a>                       (<span class="kw">let</span> [phone  (normalize-phone text)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a>                             phone' (prettify-phone phone)]</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a>                         (<span class="kw">reset!</span> phone* phone')</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true"></a>                         (rf/dispatch [<span class="at">::set-form-field</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true"></a>                                       <span class="at">:phone</span> phone])))})</span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true"></a>    ))</span></code></pre></div>
+<p>在上面的代码中，文本实际有三个状态：</p>
+<ol type="1">
+<li>Native 控件中的手机号文本</li>
+<li>React local state 中的 <code>phone*</code>，用于展示</li>
+<li>Re-frame 数据库中的 <code>:phone</code> 字段，用于提交 form</li>
+</ol>
+<p>如果把用于展示的 <code>prettify-phone</code> 输出也保存在 Re-frame DB 而非 local state 中，那么 TextInput 的更新步骤会是：用户输入 → 订阅的 Re-frame 状态（旧） → 订阅的 Re-frame 状态（新），任何输入都会有肉眼可见的闪烁。</p>
+<p>上面的代码虽然已经通过分离 global DB 和 local state 避免了基本输入情况下的闪烁，但是格式化文本的时候问题仍然存在。比如当前内容是 “158”，用户输入 “1” 后，会先显示 “1581”，在 <code>onChangeText</code> handler 处理后才会更新成 “158 1”。这个问题在当前的 RN v0.71 中似乎没有非 hack 的解决办法。我参考 <a href="https://javascript.plainenglish.io/react-native-finding-a-fix-for-flickering-field-formatting-dc1923e97cc">React Native: Fix For Flickering Field Formatting</a> 这篇文章，用两个精确重合的 TextInput 来手动控制：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a>  (<span class="kw">let</span> [phone              (<span class="at">:phone</span> (subscribe [<span class="at">::form</span>]))</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>        phone*             (hooks/use-state (prettify-phone phone))</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>        <span class="co">; 保存第一个 TextInput 的位置与大小</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>        text-input-layout* (hooks/use-state {})]</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>    <span class="co">; For display</span></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>    ($ rn/text-input {<span class="at">:placeholder</span>   <span class="st">&quot;请输入手机号&quot;</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>                      <span class="at">:value</span>         <span class="at">@phone*</span></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>                      <span class="at">:readOnly</span>      <span class="va">true</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>                      <span class="at">:pointerEvents</span> <span class="st">&quot;none&quot;</span></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>                      <span class="at">:onLayout</span>      (<span class="kw">fn</span> [ev]</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a>                                       (<span class="kw">let</span> [ev     (.-nativeEvent ^js ev)</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a>                                             layout (.-layout ^js ev)</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a>                                             {<span class="at">:keys</span> [x y width height]}</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a>                                               (j/lookup layout)]</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true"></a>                                         (<span class="kw">reset!</span> text-input-layout*</span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true"></a>                                           {<span class="at">:x</span>      x</span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true"></a>                                            <span class="at">:y</span>      y</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true"></a>                                            <span class="at">:width</span>  width</span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true"></a>                                            <span class="at">:height</span> height})))})</span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true"></a></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true"></a>    <span class="co">; For input</span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true"></a>    ($ rn/text-input {<span class="at">:style</span>        {<span class="at">:color</span>     <span class="st">&quot;transparent&quot;</span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true"></a>                                     <span class="at">:position</span>  <span class="st">&quot;absolute&quot;</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true"></a>                                     <span class="at">:left</span>      (<span class="at">:x</span> <span class="at">@text-input-layout*</span>)</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true"></a>                                     <span class="at">:top</span>       (<span class="at">:y</span> <span class="at">@text-input-layout*</span>)</span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true"></a>                                     <span class="at">:width</span>     (<span class="at">:width</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true"></a>                                                  <span class="at">@text-input-layout*</span>)</span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true"></a>                                     <span class="at">:height</span>    (<span class="at">:height</span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true"></a>                                                  <span class="at">@text-input-layout*</span>)}</span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true"></a>                      <span class="at">:inputMode</span>    <span class="st">&quot;tel&quot;</span></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true"></a>                      <span class="at">:autoComplete</span> <span class="st">&quot;tel&quot;</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true"></a>                      <span class="at">:value</span>        <span class="at">@phone*</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true"></a>                      <span class="at">:onChangeText</span> (<span class="kw">fn</span> [text]</span>
+<span id="cb2-34"><a href="#cb2-34" aria-hidden="true"></a>                                      (<span class="kw">let</span> [phone  (normalize-phone text)</span>
+<span id="cb2-35"><a href="#cb2-35" aria-hidden="true"></a>                                            phone' (prettify-phone phone)]</span>
+<span id="cb2-36"><a href="#cb2-36" aria-hidden="true"></a>                                        (<span class="kw">reset!</span> phone* phone')</span>
+<span id="cb2-37"><a href="#cb2-37" aria-hidden="true"></a>                                        (rf/dispatch [<span class="at">::set-form-field</span></span>
+<span id="cb2-38"><a href="#cb2-38" aria-hidden="true"></a>                                                      <span class="at">:phone</span> phone])))})</span>
+<span id="cb2-39"><a href="#cb2-39" aria-hidden="true"></a>  )</span></code></pre></div>
+<p>这么做闪动确实消失了，但却带来光标滞后的问题：如果用户输入速度比较快，会看到光标显示在文本结束位置之前。经过比较，我发现光标位置的问题比格式化手机号引起的闪烁在视觉上更不能接受，因此放弃了这个方案。</p>
+<p>还有一个更加影响 UX 的问题：</p>
+<ul>
+<li>在 iOS 上，当光标处于空格之后（“158 |1234”）的时候，无法删除空格。<code>prettify-phone</code> 会把 “1581234” 重新格式化成 “158 1234”，此时光标仍然在初始位置，又回到原点。</li>
+<li>在 Android 上，当光标处于空格之前（“158| 34”）的时候，无法连续输入。比如用户这时候想插入 “12”，但输入 1 后 <code>prettify-phone</code> 会把 “158134” 格式化成 “158 134”，此时光标仍然在初始位置，因此继续输入 2 后会变成逆序的 “158| 2134”。</li>
+<li>令人欣慰的是，在 iOS 上可以在空格前插入文本，在 Android 上可以在空格后删除文本。</li>
+</ul>
+<p>试过用 <code>onSelectionChange</code> / <code>selection</code> 手动控制光标，但 iOS 上光标会诡异的<a href="https://github.com/facebook/react-native/issues/36938">跳到行首</a>，只好放弃。</p>
+<p>实际上针对手机号加空格问题本身的逻辑，有一个特别的办法。通过判断被输入替换（插入或删除）掉的原字符为空格的情况，可以推导出光标的预期位置：</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a>($ rn/text-input</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>  {<span class="at">:ref</span> input-text-ref</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>   <span class="co">; 其他属性，略</span></span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>   <span class="at">:value</span> <span class="at">@phone*</span></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true"></a>   <span class="at">:onChangeText</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true"></a>     (<span class="kw">fn</span> [text]</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true"></a>       (<span class="kw">let</span> [phone     (normalize-phone</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true"></a>                         text)</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true"></a>             new-phone (prettify-phone</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true"></a>                         phone)]</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true"></a>         (<span class="kw">swap!</span> phone*</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true"></a>           (<span class="kw">fn</span> [old-phone]</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true"></a>             (<span class="kw">let</span> [old-len (<span class="kw">count</span> old-phone)</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true"></a>                   cur-len (<span class="kw">count</span> text)</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true"></a>                   [i old] (<span class="kw">-&gt;&gt;</span> (<span class="kw">map</span> <span class="kw">vector</span> old-phone text)</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true"></a>                                (keep-indexed (<span class="kw">fn</span> [i [old new]]</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true"></a>                                                (<span class="kw">when</span> (<span class="kw">not=</span> old new)</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true"></a>                                                  [i old])))</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true"></a>                                <span class="kw">first</span>)</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true"></a>                   <span class="co">; 如果新的输入覆盖了空格，那么专门处理</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true"></a>                   n       (<span class="kw">when</span> (<span class="kw">=</span> old <span class="ch">\space</span>) i)</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true"></a>                   sel     (<span class="kw">cond</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true"></a>                             (<span class="kw">and</span> (some? n) (<span class="kw">&gt;</span> cur-len old-len))</span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true"></a>                               (j/lit {<span class="at">:selection</span> {<span class="at">:start</span> (<span class="kw">+</span> n <span class="dv">2</span>)</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true"></a>                                                   <span class="at">:end</span>   (<span class="kw">+</span> n <span class="dv">2</span>)}})</span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true"></a></span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true"></a>                             (<span class="kw">and</span> (some? n) (<span class="kw">&lt;</span> cur-len old-len))</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true"></a>                               (j/lit {<span class="at">:selection</span> {<span class="at">:start</span> n <span class="at">:end</span> n}})</span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true"></a></span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true"></a>                             <span class="at">:else</span></span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true"></a>                               (j/lit {<span class="at">:selection</span> {}}))]</span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true"></a>               (.setNativeProps <span class="at">@input-text-ref</span> sel))</span>
+<span id="cb3-34"><a href="#cb3-34" aria-hidden="true"></a>             new-phone))</span>
+<span id="cb3-35"><a href="#cb3-35" aria-hidden="true"></a></span>
+<span id="cb3-36"><a href="#cb3-36" aria-hidden="true"></a>         (rf/dispatch [<span class="at">::set-form-field</span></span>
+<span id="cb3-37"><a href="#cb3-37" aria-hidden="true"></a>                       <span class="at">:phone</span> phone])))})</span></code></pre></div>
+<p>在 Android 上测试，效果十分理想。本来以为大功告成了，结果用 iOS 测试却发现光标根本不响应 <code>setNativeProps</code> 调用，完全无法工作。搜到一个 issue：<a href="https://github.com/facebook/react-native/issues/34113" class="uri">https://github.com/facebook/react-native/issues/34113</a>，新的 Fabric 架构下该方法已经失效，即使<a href="https://github.com/facebook/react-native/commit/1d3fa40c59b234f21f516db85c322ec0ed0311e0">暂时能用</a>也不推荐。</p>
+<p>最后，我只好提交了一个折中的方案：当输入覆盖空格时，为避免可能出现的编辑问题暂时不格式化文本。最近这段时间对登录界面的开发也告一段落了。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

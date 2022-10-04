@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="A blog by Yukun Guo on programming">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Bingbot" content="nocache" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - Windows Terminal批量打开标签页</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>Windows Terminal批量打开标签页</h1>
+            <div class="info">
+    Posted on October 15, 2022
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>由于文件锁的缘故，Windows 在系统更新后常常需要重启。如果选择了 Beta 或 Dev channel，重启更是家常便饭。如今 SSD / UEFI 已经普及，重启速度不再是太大的问题，但我们还是希望能从上一次会话的上下文环境中继续，以便更快的进入工作状态。</p>
+<p>大多数浏览器都可以在重启时恢复之前打开的多个 Tab（标签页，或者按微软的风格译作“选项卡”），但对开发/运维/系统管理等 IT 人员来说，恢复命令行窗口也是必须的。现在新版的 Windows Terminal 倒是可以大致恢复标签页的布局，但是打开目录、环境变量等设置都会丢失。目前暂时的解决办法就是把常用标签页和相关配置写在脚本里，自动化的执行。</p>
+<p>假设我正在做一个叫做 MyApp 的项目，需要打开以下5个标签页：</p>
+<ul>
+<li>Tab 1（主工作区和前端）
+<ul>
+<li>左侧分屏：进入 MyApp 项目所在目录。需要运行 <code>posh-git</code>，方便 Git 操作。</li>
+<li>右侧分屏：进入 MyApp 项目的前端文件夹，执行 <code>yarn watch</code>。</li>
+</ul></li>
+<li>Tab 2（客户端相关）
+<ul>
+<li>左侧：MyApp 的桌面端文件夹。需要设置好环境变量。</li>
+<li>右侧：MyApp 的移动端文件夹。需要设置好环境变量。</li>
+</ul></li>
+<li>Tab 3（后端相关）
+<ul>
+<li>上方：进入 WSL Ubuntu 中 MyServer 所在目录。需要设置好环境变量。</li>
+<li>下方：进入 MyServer 的 <code>docker</code> 子文件，启动 Docker。</li>
+</ul></li>
+<li>Tab 4（插件相关）：进入 MyPlugins 目录。</li>
+<li>Tab 5（浏览器扩展相关）：进入 MyBrowserExtensions 目录。</li>
+</ul>
+<p>为了方便区分，这些标签页需要设置颜色和名字。</p>
+<p>如果用 PowerShell Core 可以这么写（Windows Terminal 参数参考<a href="https://learn.microsoft.com/en-us/windows/terminal/command-line-arguments?tabs=windows#new-tab-command">官方文档</a>）：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode ps1"><code class="sourceCode powershell"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="co"># Some random colors</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a><span class="va">$BLUE_VIOLET</span> = <span class="st">&quot;#8A2BE2&quot;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a><span class="va">$REBECCA_PURPLE</span> = <span class="st">&quot;#663399&quot;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a><span class="va">$DODGER_BLUE</span> = <span class="st">&quot;#1E90FF&quot;</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a><span class="va">$YELLOW_GREEN</span> = <span class="st">&quot;#9ACD32&quot;</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>wt --window 0 -p <span class="st">&quot;PowerShell&quot;</span> --title <span class="st">&quot;MyApp&quot;</span> --tabColor <span class="va">$BLUE_VIOLET</span> -d <span class="st">&quot;$env:MY_APP&quot;</span> pwsh -NoExit -Command <span class="st">&quot;Import-Module posh-git \; Set-MyEnvs.ps1&quot;</span> `</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>`; split-pane -p <span class="st">&quot;PowerShell&quot;</span> --title <span class="st">&quot;MyApp&quot;</span> --tabColor <span class="va">$BLUE_VIOLET</span> -d <span class="st">&quot;$env:MY_APP\frontend&quot;</span> pwsh -NoExit -Command <span class="st">&quot;yarn watch&quot;</span> `</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>`; new-tab -p <span class="st">&quot;PowerShell&quot;</span> --title <span class="st">&quot;MyApp&quot;</span> --tabColor <span class="va">$REBECCA_PURPLE</span>  -d <span class="st">&quot;$env:MY_APP\desktop&quot;</span> pwsh -NoExit -Command <span class="st">&quot;Set-MyEnvs.ps1&quot;</span> `</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>`; split-pane -p <span class="st">&quot;PowerShell&quot;</span> --title <span class="st">&quot;MyApp&quot;</span> --tabColor <span class="va">$REBECCA_PURPLE</span> -d <span class="st">&quot;$env:MY_APP\mobile&quot;</span> pwsh -NoExit -Command <span class="st">&quot;Set-MyEnvs.ps1&quot;</span> `</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>`; new-tab -p <span class="st">&quot;Ubuntu-20.04&quot;</span> --title <span class="st">&quot;MyServer&quot;</span> -d <span class="st">&quot;\\wsl.localhost\Ubuntu-20.04\home\username\MyProjects\my-server&quot;</span> `</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>`; split-pane -H -p <span class="st">&quot;Ubuntu-20.04&quot;</span> --title <span class="st">&quot;MyServer&quot;</span> -d <span class="st">&quot;\\wsl.localhost\Ubuntu-20.04\username\MyProjects\my-server\docker&quot;</span> wsl -e bash -c <span class="st">&quot;docker compose up \; exec bash&quot;</span> `</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>`; new-tab -p <span class="st">&quot;PowerShell&quot;</span> --title <span class="st">&quot;My Plugins&quot;</span> --tabColor <span class="va">$DODGER_BLUE</span> -d <span class="st">&quot;$env:USERPROFILE\Documents\MyCode\my-plugins&quot;</span> `</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>`; new-tab -p <span class="st">&quot;PowerShell&quot;</span> --title <span class="st">&quot;My Browser Extensions&quot;</span> --tabColor <span class="va">$YELLOW_GREEN</span> -d <span class="st">&quot;$env:USERPROFILE\Documents\MyCode\my-extensions&quot;</span> `</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a>`; focus-tab -t 2</span></code></pre></div>
+<p>把上面的脚本保存成 <code>prelude.ps1</code>，放到某个已加入 <code>$env:PATH</code> 的目录下。执行该脚本即可自动打开所有标签。</p>
+<p><br /></p>
+<p>假设这时候又来了一个新项目 MyAddon，任务是写一个 node native addon 给 JavaScript 用。因为 MyAddon 并不需要每天编码，所以不宜加入 <code>prelude.ps1</code>，那么就放在另外一个脚本中，不妨叫做 <code>overtune.ps1</code>，内容如下：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode ps1"><code class="sourceCode powershell"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="va">$STEEL_BLUE</span> = <span class="st">&quot;#4682B4&quot;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>wt --window 0 -p <span class="st">&quot;PowerShell&quot;</span> --title <span class="st">&quot;MyAddon&quot;</span> --tabColor <span class="va">$STEEL_BLUE</span> -d <span class="st">&quot;$env:USERPROFILE\Code\MyAddon\core&quot;</span> pwsh -NoExit -Command <span class="st">&quot;Import-Module posh-git \; .\Set-Envs.ps1&quot;</span> `</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>`; split-pane -p <span class="st">&quot;PowerShell&quot;</span> --title <span class="st">&quot;MyAddon&quot;</span> --tabColor <span class="va">$STEEL_BLUE</span> -d <span class="st">&quot;$env:USERPROFILE\Code\MyAddon\wrapper&quot;</span> pwsh -NoExit -Command <span class="st">&quot;..\core\Set-Envs.ps1&quot;</span>`</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>`; split-pane -H -p <span class="st">&quot;PowerShell&quot;</span> --title <span class="st">&quot;MyAddon&quot;</span> --tabColor <span class="va">$STEEL_BLUE</span> -d <span class="st">&quot;$env:USERPROFILE\Code\MyAddon\demo&quot;</span> pwsh -NoExit -Command <span class="st">&quot;`$env:SOME_VAR = 'MyString'&quot;</span></span></code></pre></div>
+<p>这段脚本只打开了一个 tab，但是分割出三个 pane：左侧的 pane 是核心的 native 代码 <code>core</code>；右上的 pane 是 node NAPI 的包装 <code>wrapper</code>；右下的 pane 是演示如何在 JS 中使用的 <code>demo</code>。</p>
+<p>有了这个方法，我们再也不用担心在微软程序员冲业绩连续发布更新的时候，因被迫重启而降低工作效率了。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

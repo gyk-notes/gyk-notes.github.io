@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="A blog by Yukun Guo on programming">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Bingbot" content="nocache" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - HID丢包原因分析与解决</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>HID丢包原因分析与解决</h1>
+            <div class="info">
+    Posted on November 19, 2022
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>最近遇到一个问题：有一个<a href="https://www.viewfun.cn/qpp/107.html">多功能签批屏</a>，通过 <a href="https://en.wikipedia.org/wiki/Human_interface_device">HID</a> 协议把签名图片传回电脑。但是传输过程有相当的丢包几率，导致图片文件损坏。</p>
+<p>已知：</p>
+<ul>
+<li>用的库是 <a href="https://github.com/node-hid/node-hid">node-hid</a>（hidapi 的 node 封装）。</li>
+<li>在 Windows 7 上丢包，但 Win 10/11 正常。</li>
+<li>用厂商提供的 demo 测试并不丢包。</li>
+<li>WireShark 抓包显示收到包的数量少于预期，无其他异常。</li>
+<li>通过和原始文件比对，丢包可能发生在中间或末尾。</li>
+</ul>
+<p><strong>H</strong>uman <strong>I</strong>nterface <strong>D</strong>evice，顾名思义适用于人机接口。 HID over USB 使用 <a href="https://electronics.stackexchange.com/questions/125539/is-usb-uhci-polling-based-or-interrupt-driven">Interrupt transfer</a> 方式，侧重低延迟而非高吞吐量；文件传输则更适合 <a href="https://github.com/libusb/hidapi/issues/274#issuecomment-841700675">Bulk transfer</a>。如果是数位板，那么用 HID 传输笔迹是自然而然的方案。但这个设备是签批完成后一次性传输，签名图片大小有几百KB到1MB多的样子，用 HID 传似乎是错误的技术选型？厂商的考虑大概是 HID 不需要自己实现驱动，但这里的问题是，他们没有像 TCP 一样在协议上再封装一层可靠连接，给用户造成了不便。</p>
+<p>参考 <a href="https://learn.microsoft.com/en-us/windows-hardware/drivers/hid/troubleshooting-hid-reports#dropped-hid-reports">Troubleshooting HID reports - Dropped HID reports</a>、 <a href="https://www.cnblogs.com/shadow2006/archive/2010/07/20/1781195.html">Windows主机端与自定义USB HID设备通信详解</a> 以及 <a href="https://blog.csdn.net/phenixyf/article/details/39996117">HID读下位数据丢失问题</a> 可知，用户态程序并不和 HID 设备直接打交道，和下位机通信的是 Windows HID driver。Driver 根据下位机自定义描述符设定的时间，轮询发出 IN 包读取下位机数据，将读到的结果暂存在自身的 ring buffer 中。这个 ring buffer 默认可存储 32 个报告（在早期的 Windows 上只有两个，但对 USB 键鼠来说已勉强够用），可通过 <code>HidD_SetNumInputBuffers</code> 函数设置容量，最大值 512。如果异步读取（IOCP）不够及时，那么 ring buffer 将会丢弃较早的报告。</p>
+<p>同时，API Monitor 的监测也验证了厂商的 demo 确实把 buffer 大小设为 512。因此需要修改的地方是在 <code>hidapi</code> 中，</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>    <span class="co">/* Set the Input Report buffer size to 64 reports. */</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>    res = HidD_SetNumInputBuffers(dev-&gt;device_handle, <span class="dv">64</span>);</span></code></pre></div>
+<p>把这里的 64 改成 512。</p>
+<p>如此调整之后，丢包情况有了显著改善，但是仍然有不可忽略的发生概率（对于 1 MB 的签名图片，大约 5% ）。</p>
+<p>于是继续一阵搜索，终于在 USB 专家 Jan Axelson 的“PORTS”论坛上找到一个和这个问题完全契合的帖子：<a href="http://janaxelson.com/forum/index.php?topic=1250.0">HID - Losing Interrupt Input Reports on Windows XP</a>。 Jan Axelson 回复如下：</p>
+<blockquote>
+<p>Retrieve multiple reports at once.</p>
+<p>Every call to ReadFile has overhead.</p>
+<p>If you’re making 4000 calls to retrieve 256k (256,000/64), there is plenty of opportunity for a 512-report HID buffer to fill.</p>
+<p>Try a larger ReadFile buffer and see what happens.</p>
+</blockquote>
+<p>再顺着她贴的链接，才发现原来这个问题早就写在了 <a href="http://janaxelson.com/hidfaq.htm">HID FAQ</a> 里：</p>
+<blockquote>
+<p>To prevent losing reports, use HidD_SetNumInputBuffers to increase the buffer size, use longer reports sent less frequently, have the application read reports more often, or increase the size of the buffer in the call to ReadFile. (ReadFile returns as many reports as are available, up to ReadFile’s buffer size.)</p>
+</blockquote>
+<p>简而言之，不仅要加大 driver 的 ring buffer，还需要加大 <code>ReadFile</code> 的 buffer 来一次读取更多 report。但 hidapi 是针对单个 report 设计的，必须增加 <code>input_buffer_length</code> 和 <code>input_buffer</code> 两个字段：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a>dev-&gt;input_buffer_length = dev-&gt;input_report_length * <span class="dv">64</span>;</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>dev-&gt;read_buf = (<span class="dt">char</span>*) malloc(dev-&gt;input_buffer_length);</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>memset(dev-&gt;read_buf, <span class="dv">0</span>, dev-&gt;input_buffer_length);</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>res = ReadFile(dev-&gt;device_handle, dev-&gt;read_buf, (DWORD) dev-&gt;input_buffer_length, &amp;bytes_read, &amp;dev-&gt;ol);</span></code></pre></div>
+<p>并在 <code>hid_read_timeout</code> 中把单次调用改成循环。</p>
+<p>node-hid 的 <code>HID.cc</code> 也需要作相应调整。 <code>READ_BUFF_MAXSIZE</code> 应设置至少 <code>input_buffer_length</code> 的长度，对于 512 字节的 report size，则设为 512 * 64 = 32768。 <code>ReadWorker::Execute</code>（<a href="https://github.com/nodejs/node-addon-api/blob/main/doc/async_worker.md#execute">Napi::AsyncWorker::Execute</a>） 改为双重 while 循环，在内循环中调用 <code>hid_read_timeout</code> 读取至多 <code>input_buffer_length</code> 的长度，外循环确保尽量把传输中的数据读取完毕，以避免由于 Node 的异步任务调度而造成的丢包。</p>
+<p>这样修改过后，终于彻底解决了丢包问题，我们也收获了¥5000元外包报酬。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="A blog by Yukun Guo on programming">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Bingbot" content="nocache" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - Avoid Invoking DoDragDrop from Electron</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>Avoid Invoking DoDragDrop from Electron</h1>
+            <div class="info">
+    Posted on October 12, 2022
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>, <a title="All pages tagged 'Draft'." href="../../../tags/Draft.html">Draft</a>
+    
+</div>
+
+<p><em>As a follow up to my <a href="https://gyk-notes.github.io/posts/2022/electron-native-dnd/index.html">last post</a>.</em></p>
+<p>Today I took my time to test the native Drag-and-Drop node addon on Windows 7 SP1. To my great surprise, it did work, seamlessly. That’s rather peculiar it doesn’t work on Windows 10 20H2, yet performs flawlessly on an older version. Now things are getting interesting. How about other Windows OSes? We don’t even have a Windows 8 machine to test on…</p>
+<p>Anyway, I have discovered a workaround on Win10 20H2, by NOT invoking <code>DoDragDrop</code> at all but leveraging Chrome’s invocation. Sounds like magic?</p>
+<p>A brief aside for some history: Chrome used to be capable of doing native DnD from HTML pages. On Windows for instance, a file encoded in <code>DownloadURL</code> of the <code>DataTransfer</code> object will be converted into Win32 clipboard data of <code>CF_HDROP</code> format. However, this inate ability had been greatly restricted due to <a href="https://codereview.chromium.org/207013003">security consideration</a>.</p>
+<p>It’s not difficult to reveal the vestige of native DnD from Chromium’s codebase (and locating the implementation is left as an exercise for the readers). But how did it lose its functionality?</p>
+<p>If you prepare a file URL on DragStart by</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode js"><code class="sourceCode javascript"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>dragEvent<span class="op">.</span><span class="at">dataTransfer</span><span class="op">.</span><span class="fu">setData</span>(<span class="st">&quot;DownloadURL&quot;</span><span class="op">,</span> [<span class="st">&quot;application/octet-stream:filename.ext:file://path/to/filename.ext&quot;</span>])<span class="op">;</span></span></code></pre></div>
+<p>and inspect the dropped data from Electron with tools like OleDataDemo<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>, you will find the <code>CF_HDROP</code> data is gone. The dropfiles have been totally wiped out in <a href="https://source.chromium.org/chromium/chromium/src/+/refs/tags/108.0.5339.1:content/browser/renderer_host/render_widget_host_impl.cc;l=2079;bpv=1;bpt=1"><code>RenderWidgetHostImpl::FilterDropData</code></a>:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="dt">void</span> RenderWidgetHostImpl::FilterDropData(DropData* drop_data) {</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a><span class="pp">#if DCHECK_IS_ON()</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>  drop_data-&gt;view_id = GetRoutingID();</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a><span class="pp">#endif  </span><span class="co">// DCHECK_IS_ON()</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>  GetProcess()-&gt;FilterURL(<span class="kw">true</span>, &amp;drop_data-&gt;url);</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>  <span class="cf">if</span> (drop_data-&gt;did_originate_from_renderer) {</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>    drop_data-&gt;filenames.clear();</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a>  }</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>}</span></code></pre></div>
+<p>Now we wonder where <code>did_originate_from_renderer</code> is assigned. It is in <a href="https://source.chromium.org/chromium/chromium/src/+/refs/tags/108.0.5339.1:content/browser/web_contents/web_contents_view_aura.cc;l=252;bpv=1;bpt=1"><code>PrepareDragData</code></a>, actually, the very first line - it’s born to disappear:</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="dt">void</span> PrepareDragData(<span class="at">const</span> DropData&amp; drop_data,</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true"></a>                     ui::OSExchangeDataProvider* provider,</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>                     WebContentsImpl* web_contents) {</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true"></a>  provider-&gt;MarkOriginatedFromRenderer();</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>  <span class="co">// ...</span></span></code></pre></div>
+<p><code>MarkOriginatedFromRenderer</code> adds a custom clipboard format <code>"chromium/x-renderer-taint"</code> to the <code>IDataObject</code> as a mark, making <a href="https://source.chromium.org/chromium/chromium/src/+/refs/tags/108.0.5339.1:ui/base/dragdrop/os_exchange_data_provider_win.cc;l=305"><code>OSExchangeDataProviderWin::DidOriginateFromRenderer</code></a> return true later, so dropfiles will eventually be cleared out before <code>IDropTarget::DragEnter</code> is called.</p>
+<p>Now, back to the workaround. As explained in <a href="https://gyk-notes.github.io/posts/2022/electron-native-dnd/index.html">my last post</a>, node addons are not privileged to create a <code>ScopedNestableTaskAllower</code>. But according to the analysis above, Chrome has already made its <code>IDataObject</code>, with an empty <code>CF_HDROP</code> slot (The “Storage Medium” column is <code>HGLOBAL</code> but the “Used Medium” is null). Here comes the trick: We can create an <code>IDropTarget</code> adapter, obtain Chrome’s original one from <code>GetPropW(HWND(ptr), w!("OleDropTargetInterface"))</code>, replace the latter with the former with a <code>RevokeDragDrop</code> followed by a <code>RegisterDragDrop</code>, and hijack Chrome’s poor <code>IDataObject</code> for our own benefit.</p>
+<p>The implementation of our custom <code>IDropTarget</code> is quite straightforward. It dispatches the drag events to the original <code>IDropTarget</code> wrapped inside it for all the <a href="https://learn.microsoft.com/en-us/windows/win32/api/oleidl/nn-oleidl-idroptarget#methods">methods</a> defined in the <code>IDropTarget</code> interface. The critical job is done in <code>IDropTarget::DragEnter</code>: It calls (Chrome’s) <code>IDataObject::SetData</code> to restore the missing list of dragfiles. The dragfiles are passed via a “global variable”, or more precisely, a thread-local <code>static STATE: RefCell&lt;DragState&gt;</code> in Rust, which is refreshed every time a drag starts.</p>
+<p>By avoiding calling <code>DoDragDrop</code> directly, DnD within app works again.</p>
+<section class="footnotes" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1" role="doc-endnote"><p>Jochen Arndt. <a href="https://www.codeproject.com/Articles/886711/Drag-Drop-Images-and-Drop-Descriptions-for-MFC-App">Drag &amp; Drop Images and Drop Descriptions for MFC Applications</a>, CodeProject<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

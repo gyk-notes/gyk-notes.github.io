@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="A blog by Yukun Guo on programming">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Bingbot" content="nocache" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - Invoking DoDragDrop from Electron</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>Invoking DoDragDrop from Electron</h1>
+            <div class="info">
+    Posted on October  4, 2022
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>, <a title="All pages tagged 'Draft'." href="../../../tags/Draft.html">Draft</a>
+    
+</div>
+
+<p>Electron’s native Drag-and-Drop is broken<a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a>. The built-in <code>webContents.startDrag</code> only supports dragging one file at a time, does not allow to choose the drag image on the fly, lacks fine controls (modifier keys like Shift/Ctrl, drag effects like copy/move), and requires separate handling from your common HTML5 Drag’n’Drop routines.</p>
+<p>One “solution” you might come up with is calling into the system’s DnD APIs via node addon. On Windows, this involves the complexity of Win32 OLE Data Transfer protocol: <code>IDataObject</code>, <code>IDropSource</code>, <code>IDropTarget</code>, <code>DoDragDrop</code> and friends. It seems promising at first glance, but in reality, making it work with Electron is just asking for troubles.</p>
+<p>According to my tests, initiating dragging from node module may conflict with HTML drop targets inside the app, depending on your OS version. It works on Windows 10 21H2 and Windows 11, but fails on Windows 10 20H2. (Haven’t tried it on Windows 7 but don’t expect it work there.)</p>
+<p>Yesterday, I was digging a bit into the Chromium codebase, trying to find out why it behaves this way.</p>
+<p>The biggest problem is <code>DoDragDrop</code> being intrinsically synchronous. When the application calls <code>DoDragDrop</code>, it falls into OLE’s modal message loop, and meanwhile, the GUI thread’s original message loop gets hung up. It effectively prevents the Win32 MouseMove events, upon which HTML dragging events depend, from firing, so the latter doesn’t work any more.</p>
+<p>But how can Chrome’s own HTML DnD work, if it also has to use the same set of underlying APIs?</p>
+<p>Actually, after OLE takes charge of the message loop, the communication between DnD source and target completely relies on the <code>IDropSource</code>/<code>IDropTarget</code> interfaces. For example, when the drag source is being dragged over a drop target, the <code>POINTL</code> struct <code>cursor_position</code> is passed to <a href="https://source.chromium.org/chromium/chromium/src/+/refs/tags/108.0.5339.1:ui/base/dragdrop/drop_target_win.cc;l=58"><code>DropTargetWin::DragOver</code></a>, which tells <code>IDropTargetHelper</code> to update the drag image, and further calls <a href="https://source.chromium.org/chromium/chromium/src/+/refs/tags/108.0.5339.1:ui/views/widget/desktop_aura/desktop_drop_target_win.cc;l=71"><code>DesktopDropTargetWin::OnDragOver</code></a> so handlers down the chain can have a chance to respond to the DragOver event. This is why when dragging an image on a page over the page itself, despite there are no normal Win32 MouseMove events firing, the JavaScript code still receives <code>DragOver</code>s and the HTML drop target can instantly display visual hints to the user.</p>
+<p>(Sometimes the drag target can also respond that it is incompatible with the drag source, and a 🚫 symbol will be shown.)</p>
+<p>Nonetheless, Chrome has task reentrancy protection enabled by default (emphasis mine):</p>
+<blockquote>
+<p>This means that if a task is being processed, a second task cannot start until the first task is finished. Reentrancy can happen when processing a task, and an inner message pump is created. That inner pump then processes native messages which could implicitly start an inner task. Inner message pumps are created with dialogs (DialogBox), common dialogs (GetOpenFileName), <strong>OLE functions (DoDragDrop)</strong>, printer functions (StartDoc) and many others.</p>
+<p>— <a href="https://chromium.googlesource.com/chromium/src/+/master/docs/threading_and_tasks.md#task-reentrancy">Threading and Tasks in Chrome</a></p>
+</blockquote>
+<p>So before the code is ready to block its own message loop by calling <code>DoDragDrop</code>, reentrancy protection should be turned off temporarily, just as <a href="https://source.chromium.org/chromium/chromium/src/+/refs/tags/108.0.5339.1:content/browser/web_contents/web_contents_view_aura.cc;l=1150"><code>WebContentsViewAura::StartDragging</code></a> does<a href="#fn2" class="footnote-ref" id="fnref2" role="doc-noteref"><sup>2</sup></a>:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>  <span class="co">// We need to enable recursive tasks on the message loop so we can get</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>  <span class="co">// updates while in the system DoDragDrop loop.</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>  DragOperation result_op;</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>  {</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>    gfx::NativeView content_native_view = GetContentNativeView();</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>    base::CurrentThread::ScopedNestableTaskAllower allow;</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a>    result_op =</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>        aura::client::GetDragDropClient(root_window)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>            -&gt;StartDragAndDrop(<span class="bu">std::</span>move(data), root_window,</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>                               content_native_view, event_info.location,</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>                               ConvertFromDragOperationsMask(operations),</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>                               event_info.source);</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>  }</span></code></pre></div>
+<p>Now the question can be answered: We are not able to make use of <code>ScopedNestableTaskAllower</code> in the node addon. So during the <code>DoDragDrop</code> call, all mouse events are queued up, no <code>dragover</code> events arrive at the JavaScript land, and no drop indicators are shown to the user. There is also a sad ending to the story: As soon as the mouse button is released, all of a sudden, the queued events flood in, leaving the user of your freezing Electron app astonished and astounded.</p>
+<section class="footnotes" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1" role="doc-endnote"><p>Erik Jälevik. <a href="https://www.fileside.app/blog/2019-04-22_fixing-drag-and-drop/">Fixing drag and drop in Electron</a>.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+<li id="fn2" role="doc-endnote"><p>So does Electron’s <a href="https://github.com/electron/electron/pull/6333/files#diff-227557aea0e44d151763c9b388c19921363264530a08fb35bfb97f82cfdace08R1230"><code>WebContents::StartDrag</code></a>.<a href="#fnref2" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>
