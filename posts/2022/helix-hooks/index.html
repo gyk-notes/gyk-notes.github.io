@@ -12,7 +12,7 @@
         <meta name="Baiduspider" content="noindex, nofollow" />
         <meta name="Sogou web spider" content="noindex, nofollow" />
 
-        <title>gyk-notes - A Failed Attemp to Reinvent Hook Wrapper in Clojure</title>
+        <title>gyk-notes - A Failed Attemp to Reinvent Hook Wrapper in ClojureScript</title>
         <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
         <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
         <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
@@ -31,7 +31,7 @@
         </div>
         <div class="sep-line"></div>
         <div id="content">
-            <h1>A Failed Attemp to Reinvent Hook Wrapper in Clojure</h1>
+            <h1>A Failed Attemp to Reinvent Hook Wrapper in ClojureScript</h1>
             <div class="info">
     Posted on September 11, 2022
     
@@ -62,7 +62,7 @@
 <span id="cb3-3"><a href="#cb3-3" aria-hidden="true"></a>  (<span class="kw">swap!</span> state f arg))</span></code></pre></div>
 <p>The <code>state</code> returned is an Atom-like object, so you can just manipulate it with <code>reset!</code>, <code>swap!</code>, etc. This is arguably the most familiar way to Clojure developers.</p></li>
 </ol>
-<p>Each approach comes with its pros and cons. Notably, <a href="https://github.com/roman01la/uix">UIx</a> uses the 3rd approach while <a href="https://github.com/lilactown/helix">Helix</a> uses the 1st one.</p>
+<p>Each approach comes with its pros and cons. Notably, <a href="https://github.com/roman01la/uix">UIx</a> uses the 3rd approach while <a href="https://github.com/lilactown/helix">Helix</a> uses the first one.</p>
 <p>At my day job, when our team made the decision to switch from UIx to Helix, some colleagues added a custom <code>hooks</code> module to continuingly use the Atom-like hooks with Helix, so as to make the transition painless. But it was kind of funny that when I checked the code later, my first impression was the usage of <code>useMemo</code> hook looked a bit convoluted for me:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a>(<span class="bu">defn</span><span class="fu"> state </span>[value]</span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a>  <span class="pp">#?</span>(<span class="at">:cljs</span> (<span class="kw">let</span> [[value set-value] (r/useState value)</span>
