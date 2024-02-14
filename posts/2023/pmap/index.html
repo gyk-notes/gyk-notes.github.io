@@ -47,8 +47,8 @@
 <li>Upload files to cloud storage</li>
 <li>Call a RESTful API for bunches of arguments</li>
 </ul>
-<p>Unfortunately, the SDK we use does not provide non-blocking APIs. So, go-block is a no-go. Calling <code>(map upload-file! files)</code> <a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> loses the opportunity to run <code>upload-file!</code> in parallel. But Clojure provides a convenient way to make it parallel: <a href="https://clojuredocs.org/clojure.core/pmap"><code>pmap</code></a>. Just prepend <code>map</code> with letter <code>p</code>, with literally a single keystroke, you immediately solve the problem — or not?</p>
-<p>It turns out such free lunch comes with a price. As Sean Corfield <a href="https://ask.clojure.org/index.php/8396/pmap-hard-wired-level-of-parallelism?show=8401#c8401">said</a>, “pmap is a very blunt instrument and, although it can be a useful quick’n’dirty solution occasionally, you generally want to avoid it.” When doing my research, I found the article <a href="https://bsless.github.io/mapping-parallel-side-effects/">Idiomatic Clojure: Mixing Parallel Side Effects and Iteration</a> has nicely put the reasons against using <code>pmap</code> and discussed the alternatives. This post is basically my notes on reading it.</p>
+<p>Unfortunately, the SDK we use does not provide any non-blocking APIs. So, go-block is a no-go. Calling <code>(map upload-file! files)</code> <a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> loses the opportunity to run <code>upload-file!</code> in parallel. But Clojure provides a convenient way to make it parallel: <a href="https://clojuredocs.org/clojure.core/pmap"><code>pmap</code></a>. Just prepend <code>map</code> with letter <code>p</code>, with literally a single keystroke, you immediately solve the problem — or not?</p>
+<p>It turns out such free lunch comes with a price. As Sean Corfield said in <a href="https://ask.clojure.org/index.php/8396/pmap-hard-wired-level-of-parallelism?show=8401#c8401">this post</a>, “pmap is a very blunt instrument and, although it can be a useful quick’n’dirty solution occasionally, you generally want to avoid it.” When doing my research, I found the article <a href="https://bsless.github.io/mapping-parallel-side-effects/">Idiomatic Clojure: Mixing Parallel Side Effects and Iteration</a> has nicely put the reasons against using <code>pmap</code> and discussed the alternatives. This post is basically my notes on reading it.</p>
 <h2 id="how-pmap-works">How <code>pmap</code> works</h2>
 <p>Take a look at the actual code of <code>pmap</code> from Clojure’s GitHub repo:</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a>(<span class="bu">defn</span><span class="fu"> pmap</span></span>
@@ -61,7 +61,7 @@
 <span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>                  (<span class="kw">cons</span> (<span class="kw">deref</span> x) (step xs (<span class="kw">rest</span> s)))</span>
 <span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>                  (<span class="kw">map</span> <span class="kw">deref</span> vs))))]</span>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>    (step rets (<span class="kw">drop</span> n rets))))</span></code></pre></div>
-<p>The implementation is concise but a bit tricky. Before trying to grok how it works, here is a refresher for <a href="https://clojuredocs.org/clojure.core/lazy-seq"><code>lazy-seq</code></a>, one of the fundamental building blocks for laziness in Clojure.</p>
+<p>The implementation is concise but a bit tricky. Before delving into how it works, firstly, here is a refresher for <a href="https://clojuredocs.org/clojure.core/lazy-seq"><code>lazy-seq</code></a>, one of the fundamental building blocks for laziness in Clojure.</p>
 <p><code>(lazy-seq &amp; body)</code> returns a <code>clojure.lang.LazySeq</code> which represents delayed computation. A <code>LazySeq</code> holds a reference to an <code>IFn</code> of <code>(fn [] body)</code> which evaluates to some <code>ISeq</code>, but it will only invoke the body <a href="https://github.com/clojure/clojure/blob/clojure-1.11.1/src/jvm/clojure/lang/LazySeq.java#L50C5-L50C5">the first time <code>seq</code> is called</a>. It is often used in tandem with <code>cons</code> to construct a lazy sequence.</p>
 <p>This <a href="https://stackoverflow.com/a/12390331">StackOverflow</a> answer clarifies what <code>cons</code> is and how does it work with <code>lazy-seq</code>:</p>
 <blockquote>
@@ -69,12 +69,12 @@
 </blockquote>
 <p>To be a little more pedantic, the second argument to <code>cons</code> (the function) <a href="https://github.com/clojure/clojure/blob/clojure-1.11.1/src/jvm/clojure/lang/RT.java#L682">can also be <code>nil</code></a>, in order to make the end of a <em>proper</em> list:</p>
 <div class="sourceCode" id="cb2"><pre class="sourceCode java"><code class="sourceCode java"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="dt">static</span> <span class="kw">public</span> ISeq <span class="fu">cons</span>(<span class="bu">Object</span> x, <span class="bu">Object</span> coll){</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>	<span class="kw">if</span>(coll == <span class="kw">null</span>)</span>
-<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>		<span class="kw">return</span> <span class="kw">new</span> <span class="fu">PersistentList</span>(x);</span>
-<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>	<span class="kw">else</span> <span class="kw">if</span>(coll <span class="kw">instanceof</span> ISeq)</span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>		<span class="kw">return</span> <span class="kw">new</span> <span class="fu">Cons</span>(x, (ISeq) coll);</span>
-<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>	<span class="kw">else</span></span>
-<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>		<span class="kw">return</span> <span class="kw">new</span> <span class="fu">Cons</span>(x, <span class="fu">seq</span>(coll));</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a>    <span class="kw">if</span>(coll == <span class="kw">null</span>)</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>        <span class="kw">return</span> <span class="kw">new</span> <span class="fu">PersistentList</span>(x);</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a>    <span class="kw">else</span> <span class="kw">if</span>(coll <span class="kw">instanceof</span> ISeq)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>        <span class="kw">return</span> <span class="kw">new</span> <span class="fu">Cons</span>(x, (ISeq) coll);</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>    <span class="kw">else</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a>        <span class="kw">return</span> <span class="kw">new</span> <span class="fu">Cons</span>(x, <span class="fu">seq</span>(coll));</span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a>}</span></code></pre></div>
 <p>For demonstration, the following is a simplified implementation of <code>map</code> based on <code>lazy-seq</code> and <code>cons</code>:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a>(<span class="bu">defn</span><span class="fu"> my-map</span></span>
@@ -84,7 +84,7 @@
 <span id="cb3-5"><a href="#cb3-5" aria-hidden="true"></a>     (<span class="kw">cons</span> (f (<span class="kw">first</span> s)) (my-map f (<span class="kw">rest</span> s))))))</span></code></pre></div>
 <hr />
 <p>Now back to <code>pmap</code> after the aside. <code>pmap</code> tries to run functions with a degree of parallelism of <code>#CPUs + 2</code>, referred as <code>n</code> in the code, trying to achieve optimum utilization, as stated in <a href="https://ask.clojure.org/index.php/8396/pmap-hard-wired-level-of-parallelism?show=8398#a8398"><em>Java Concurrency In Practice</em></a>.</p>
-<p>In the second binding of <code>let</code> form, it sets up return values <code>rets</code> by <code>(map #(future (f %)) coll)</code>. Recalling <code>map</code> is lazy, the realization of <code>future</code>s is postponed here. Once evaluated, the future will be dispatched onto <code>clojure.lang.Agent/soloExecutor</code> for actual execution.</p>
+<p>In the second binding of <code>let</code> form, it sets up return values <code>rets</code> by <code>(map #(future (f %)) coll)</code>. Recalling <code>map</code> is lazy, here the realization of <code>future</code>s is postponed. Once evaluated, the future will be dispatched onto <code>clojure.lang.Agent/soloExecutor</code> for actual execution.</p>
 <p>And then comes the <code>step</code> function. <code>step</code> takes two arguments: <code>vs</code>, the return values not yet consumed, and <code>fs</code>, the delayed futures not yet realized. It returns a lazy sequence by wrapping the code inside <code>lazy-seq</code>, so the results are computed on demand as they are accessed. However, we will see in a moment that <code>pmap</code> is actually semi-lazy.</p>
 <p>In each step (hence the name), <code>step</code> calls <code>(seq fs)</code> to force the evaluation of the first element of <code>fs</code> should <code>fs</code> be non-empty, making a new computation of <code>f</code> take place. After that, it returns a list where the head is the head of <code>vs</code> <code>deref</code>ed, and the rest is composed by recursively calling <code>(step (rest vs) (rest fs))</code>. Note that if the caller tries to consume the head before the actual computation is done, it will block on the <code>deref</code>. Furthermore, in case <code>fs</code> is empty, it means the computation is almost finished, so the whole <code>vs</code> is <code>deref</code>ed and yielded.</p>
 <p>Reaching the last line, the initial call to <code>step</code> is <code>(step rets (drop n rets))</code>. <code>rets</code> and <code>(drop n rets)</code> share the tail of sequence, except that <code>(drop n rets)</code> points to a position <code>n</code> elements ahead. <code>(drop n ...)</code> actually has the side effect of realizing the first <code>n</code> computations. This is the reason we call <code>pmap</code> “semi-lazy”, as the first <code>n</code> elements of <code>coll</code> are computed eagerly even before any consumption of results.</p>
@@ -99,8 +99,8 @@
 <p>… <em>Semi-lazy</em> in that the parallel computation stays ahead of the consumption, but doesn’t realize the entire result unless required. Only useful for <em>computationally intensive</em> functions where the time of <code>f</code> dominates the <em>coordination overhead</em>.</p>
 </blockquote>
 <ul>
-<li><p>Semi-lazy: Not eager, not lazy, but in between. This will be a headache if your code relies on the side effects of the function calls. Parallel programming and laziness have intrinsically conflicting goals, which also places semi-laziness in some embarrassing position.</p></li>
-<li><p>Only suitable for computationally intensive functions: Quoting <em>Java Concurrency In Practice</em>,</p>
+<li><p><em>Semi-lazy</em>: Not eager, not lazy, but in between. This will be a headache if your code relies on the side effects of the function calls. Parallel programming and laziness have intrinsically conflicting goals, which also places semi-laziness in some embarrassing position.</p></li>
+<li><p>Only suitable for <em>computationally intensive</em> functions: Quoting <em>Java Concurrency In Practice</em>,</p>
 <blockquote>
 <p>Even compute-intensive threads occasionally take a page fault or pause for some other reason, so an “extra” runnable thread prevents CPU cycles from going unused when this happens.</p>
 </blockquote>
@@ -108,7 +108,7 @@
 <p>For tasks that also include I/O or other blocking operations, you want a larger pool, since not all of the threads will be schedulable at all times.</p>
 </blockquote>
 <p><code>pmap</code> spawns a fixed number of <code>#CPUs + 2</code> threads, so it’s suboptimal for IO-bound operations.</p></li>
-<li><p>If <code>f</code> is a lightweight, short-lived function despite being CPU-bound, and you use <code>pmap</code> in a tight loop, the coordination overhead may neutralize the benefits of extra parallelism.</p></li>
+<li><p>If <code>f</code> is a lightweight, short-lived function despite being CPU-bound, and you use <code>pmap</code> in a tight loop, the <em>coordination overhead</em> may also neutralize the benefits of extra parallelism.</p></li>
 </ul>
 <p>Besides the above points, there are other drawbacks:</p>
 <ul>
@@ -121,7 +121,7 @@
 <p>If you call two <code>pmap</code>s consecutively, the second call may cause more threads spawned than expected.</p></li>
 <li><p>No backpressure, as the thread pool can keep growing.</p></li>
 <li><p>To make semi-laziness even more unpredictable, when chunked-seq is used the sequence is realized in chunks of 32 elements.</p></li>
-<li><p><code>pmap</code> preserves order, sometimes it is unnecessary and may hinde on-time delivery to the downstream pipeline.</p></li>
+<li><p><code>pmap</code> preserves order, sometimes it is unnecessary and may hinde on-time delivery to the downstream.</p></li>
 </ul>
 <h2 id="a-better-pmap">A better <code>pmap</code></h2>
 <p>To recap, for IO-bound operations it is fundamentally wrong to choose the number of threads based on either the count of CPU cores, because it is not CPU-bound, or the count of the collection, because that may be a very large number. Instead, we should choose the number large enough to saturate the IO bandwidth, but not larger. Usually, the number is specific to the task at hand, and should be kept globally across the instance.</p>
@@ -176,7 +176,7 @@
 </tr>
 </tbody>
 </table>
-<p>(Not really ♾️ but makes little difference in practice.)</p>
+<p>(Not really ∞ but makes little difference in practice.)</p>
 <p>The usage:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode clojure"><code class="sourceCode clojure"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true"></a>(<span class="kw">try</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true"></a>  (<span class="kw">let</span> [results (pmap* upload-file! files)]</span>

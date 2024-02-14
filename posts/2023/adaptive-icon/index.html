@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="A blog by Yukun Guo on programming">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Bingbot" content="nocache" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - Convert Figma-exported SVG into Android's Adaptive Icon</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>Convert Figma-exported SVG into Android's Adaptive Icon</h1>
+            <div class="info">
+    Posted on December 19, 2023
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>Lately, I decided to switch our Expo app to use <a href="https://developer.android.com/develop/ui/views/launch/icon_design_adaptive">adaptive icons</a> on Android. The Android version used to share the icon with iOS (by assigning <code>expo.android.icon</code> the same value as <code>expo.icon</code> in <code>app.json</code>). However, this looked terrible on Android systems where circular launcher icons are used. Adopting to adaptive icons will make the app not only more polished, but also integrate better with the latest Android’s visual effects and user theming.</p>
+<h2 id="the-challenges">The Challenges</h2>
+<p>The icon was designed on Figma but not based on any Adaptive Icon Template, so it takes some effort to convert it into a usable format for Android.</p>
+<p>The challenges are:</p>
+<ul>
+<li>Some parts of the icon are made of clipping masks <a href="#fn1" class="footnote-ref" id="fnref1" role="doc-noteref"><sup>1</sup></a> in Figma, as such it is not straightforward to extract the foreground contours as closed curves.</li>
+<li>For whatever reason, the exported SVG is not rendered correctly in Inkscape.</li>
+<li>Additionally, I only have access to read-only mode in Figma.</li>
+</ul>
+<h2 id="icon-size-and-safe-zone">Icon Size and Safe Zone</h2>
+<p>First of all, how to choose the icon size? According to <a href="https://developer.android.com/develop/ui/views/launch/icon_design_adaptive#design-adaptive-icons" title="Design adaptive icons">Android adaptive icon guidelines</a>, it is an icon in a 72x72 dp safe zone in a 108x108 dp container. For native Android development, using a 108x108 SVG should be preferred, but AFAIK Expo doesn’t support SVG format for Android adaptive icons. <a href="https://github.com/aeirola/react-native-svg-app-icon">react-native-svg-app-icon</a> looks promising, but it seems more suitable for bare React Native rather than Expo.</p>
+<p>So, if we have to deal with raster images, what about the resolution? Expo’s documentation suggests at least 512x512, and I think 1024x1024 should be a good choice as it is the same as the iOS one.</p>
+<p>Expo’s default icon (located at <code>./assets/images/adaptive-icon.png</code> and is also 1024x1024) has some nice construction lines on it to help designers align the foreground content, which should just fit within the <a href="https://blog.tgxn.net/expo-adaptive-app-icon/">outermost circle</a>.</p>
+<p>From <a href="https://medium.com/google-design/designing-adaptive-icons-515af294c783">Designing Adaptive Icons</a> (It is a blog run by <em>Google Design</em> so I assume it is semi-official),</p>
+<blockquote>
+<p>Adaptive icons are 108dp*108dp in size but are masked to a maximum of 72dp*72dp. Different devices can supply different masks which must be convex in shape and may reach a minimum of 33dp from the center in places.</p>
+<p>Because of the minimum reach of the mask, you can consider a centered 66dp diameter circle as a safe zone, guaranteed not to be clipped.</p>
+</blockquote>
+<p>In <a href="https://github.com/aeirola/react-native-svg-app-icon?tab=readme-ov-file#icon-format">react-native-svg-app-icon</a>’s README there is an even better illustration:</p>
+<figure>
+<img src="./cropping.svg" alt /><figcaption>Icon Cropping</figcaption>
+</figure>
+<ul>
+<li><span style="color: #444">🔴︎ </span> Overflow area.</li>
+<li><span style="color: #666">🔴︎ </span> Visible area.</li>
+<li><span style="color: #888">🔴︎ </span> iOS / Android legacy square crop.</li>
+<li><span style="color: #AAA">🔴︎ </span> Android legacy circular crop.</li>
+<li><span style="color: #CCC">🔴︎ </span> Safe area.</li>
+<li><span style="color: #F55">🔴︎ </span> Icon keylines.</li>
+</ul>
+<p>To put it briefly, content outside the 72x72 square is definitely unsafe, while inside the 66dp diameter circle is definitely safe.</p>
+<h2 id="the-solution">The Solution</h2>
+<p>From the analysis above, just fit the main element of the icon inside the circle of safe area, and rasterize the SVG to 1024x1024 image should produce an acceptable result.</p>
+<p>Step-by-step:</p>
+<ul>
+<li><p>In Figma’s “Layers” panel in the left sidebar, right click the entity representing the app icon, and copy it as SVG.</p></li>
+<li><p>Use free services like <a href="https://www.svgviewer.dev/">SVGViewer</a> to prettify the SVG markup.</p></li>
+<li><p>Now, take a look at the SVG code. It is on a 327x327 canvas and has a circle of radius 163.5 as a mask:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode xml"><code class="sourceCode xml"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a><span class="kw">&lt;svg</span><span class="ot"> width=</span><span class="st">&quot;327&quot;</span><span class="ot"> height=</span><span class="st">&quot;327&quot;</span><span class="ot"> viewBox=</span><span class="st">&quot;0 0 327 327&quot;</span><span class="ot"> fill=</span><span class="st">&quot;none&quot;</span><span class="ot"> xmlns=</span><span class="st">&quot;http://www.w3.org/2000/svg&quot;</span><span class="kw">&gt;</span></span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>  <span class="kw">&lt;mask</span><span class="ot"> id=</span><span class="st">&quot;mask0_3983_11989&quot;</span><span class="ot"> style=</span><span class="st">&quot;mask-type:alpha&quot;</span><span class="ot"> maskUnits=</span><span class="st">&quot;userSpaceOnUse&quot;</span><span class="ot"> x=</span><span class="st">&quot;0&quot;</span><span class="ot"> y=</span><span class="st">&quot;0&quot;</span><span class="ot"> width=</span><span class="st">&quot;327&quot;</span><span class="ot"> height=</span><span class="st">&quot;327&quot;</span><span class="kw">&gt;</span></span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>    <span class="kw">&lt;circle</span><span class="ot"> cx=</span><span class="st">&quot;163.5&quot;</span><span class="ot"> cy=</span><span class="st">&quot;163.5&quot;</span><span class="ot"> r=</span><span class="st">&quot;163.5&quot;</span><span class="ot"> fill=</span><span class="st">&quot;#FF612F&quot;</span><span class="kw">/&gt;</span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>    <span class="kw">&lt;circle</span><span class="ot"> cx=</span><span class="st">&quot;163.5&quot;</span><span class="ot"> cy=</span><span class="st">&quot;163.5&quot;</span><span class="ot"> r=</span><span class="st">&quot;163.5&quot;</span><span class="ot"> fill=</span><span class="st">&quot;url(#paint0_radial_3983_11989)&quot;</span><span class="ot"> fill-opacity=</span><span class="st">&quot;0.6&quot;</span><span class="kw">/&gt;</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a>  <span class="kw">&lt;/mask&gt;</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a>  ...</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a><span class="kw">&lt;/svg&gt;</span></span></code></pre></div>
+<p>As said, the outer circle in Expo’s example icon corresponds to the 66dp safe area. In raster graphics editor, I measure the diameter of the outer circle to be approx. 612 - 616px. Coincidentally, 616 gives a simpler fraction (616/66 = 28/3 v.s. 612/66 = 102/11). Anyway the difference is insignificant – just some measurement error.</p></li>
+<li><p>By 616 / 327 = 1.88379204892966, I apply a scale transformation to the graph:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode xml"><code class="sourceCode xml"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">&lt;svg</span><span class="ot"> width=</span><span class="st">&quot;1024&quot;</span><span class="ot"> height=</span><span class="st">&quot;1024&quot;</span><span class="ot"> viewBox=</span><span class="st">&quot;0 0 1024 1024&quot;</span><span class="ot"> fill=</span><span class="st">&quot;none&quot;</span><span class="ot"> xmlns=</span><span class="st">&quot;http://www.w3.org/2000/svg&quot;</span><span class="kw">&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a><span class="kw">&lt;g</span><span class="ot"> transform=</span><span class="st">&quot;scale(1.88379204892966) translate(103 103)&quot;</span><span class="kw">&gt;</span></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a>  ...</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a><span class="kw">&lt;/g&gt;</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a><span class="kw">&lt;/svg&gt;</span></span></code></pre></div>
+<p>It looks good in SVGViewer’s preview panel.</p></li>
+<li><p>By deleting those foreground nodes from XML tree, I obtain the background icon – it’s just a solid square with gradient fill.</p></li>
+<li><p>Finally, use the method from <a href="https://mybyways.com/blog/convert-svg-to-png-using-your-browser">Convert SVG to PNG using your browser</a> to export both foreground and background as PNG images.</p></li>
+</ul>
+<p>This may not be an ideal workflow, but it works.</p>
+<section class="footnotes" role="doc-endnotes">
+<hr />
+<ol>
+<li id="fn1" role="doc-endnote"><p>Not conventional masks, actually just strips of background color that cover part of the foreground shape.<a href="#fnref1" class="footnote-back" role="doc-backlink">↩︎</a></p></li>
+</ol>
+</section>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>

@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="description" content="A blog by Yukun Guo on programming">
+
+        <meta name="googlebot" content="noindex, nofollow" />
+        <meta name="Googlebot-Mobile" content="noindex, nofollow" />
+        <meta name="Bingbot" content="nocache" />
+        <meta name="Baiduspider" content="noindex, nofollow" />
+        <meta name="Sogou web spider" content="noindex, nofollow" />
+
+        <title>gyk-notes - 支持App多变体构建的Expo配置</title>
+        <link href="http://fonts.googleapis.com/css?family=Open+Sans:400italic,600italic,700italic,400,600,700" rel="stylesheet" type="text/css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/default.css" />
+        <link rel="stylesheet" type="text/css" href="../../../css/syntax.css" />
+    </head>
+    <body>
+        <div id="header">
+            <div id="logo">
+                <a href="../../../">gyk-notes</a>
+            </div>
+            <div id="navigation">
+                <a href="../../../">Home</a>
+                <a href="../../../about.html">About</a>
+                <a href="../../../contact.html">Contact</a>
+                <a href="../../../archive.html">Archive</a>
+            </div>
+        </div>
+        <div class="sep-line"></div>
+        <div id="content">
+            <h1>支持App多变体构建的Expo配置</h1>
+            <div class="info">
+    Posted on January 29, 2024
+    
+</div>
+<div class="info">
+    
+    Tags: <a title="All pages tagged 'Code'." href="../../../tags/Code.html">Code</a>
+    
+</div>
+
+<p>在安卓移动开发中，同时构建应用的多个变体（App variants）是一项必不可少的需求。其中最常见的场景是将 Debug 和 Release 变体分别对应到不同的 App ID，这样就允许在一台安卓设备上同时安装调试版和发布版。对于使用了 Expo 框架的项目来说，调试版可以利用 Expo 动态加载的特性快速迭代，发布版则可测试实际性能和最终用户交互，二者共存才便于开发和调试。</p>
+<p>参考 Expo 文档 <a href="https://docs.expo.dev/build-reference/variants/">Install app variants on the same device</a>，可作如下配置：</p>
+<p>修改 <code>eas.json</code>：</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode diff"><code class="sourceCode diff"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true"></a> {</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true"></a>   &quot;build&quot;: {</span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true"></a>     &quot;development&quot;: {</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true"></a>       &quot;developmentClient&quot;: true,</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true"></a><span class="va">+      &quot;env&quot;: {</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true"></a><span class="va">+        &quot;APP_VARIANT&quot;: &quot;development&quot;</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true"></a><span class="va">+      },</span></span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true"></a>       &quot;distribution&quot;: &quot;internal&quot;</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true"></a>     },</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true"></a>     &quot;preview&quot;: {</span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true"></a>       &quot;channel&quot;: &quot;preview&quot;,</span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true"></a>       &quot;distribution&quot;: &quot;internal&quot;</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true"></a>     },</span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true"></a>     &quot;production&quot;: {</span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true"></a><span class="st">-      &quot;channel&quot;: &quot;production&quot;</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true"></a><span class="va">+      &quot;channel&quot;: &quot;production&quot;,</span></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true"></a><span class="va">+      &quot;env&quot;: {</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true"></a><span class="va">+        &quot;APP_VARIANT&quot;: &quot;production&quot;</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true"></a><span class="va">+      }</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true"></a>     }</span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true"></a>   }</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true"></a> }</span></code></pre></div>
+<p>增加 <code>app.config.js</code> 文件，用于覆写 <code>app.json</code> 中的设置项：</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode js"><code class="sourceCode javascript"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true"></a><span class="kw">const</span> _ <span class="op">=</span> <span class="pp">require</span>(<span class="st">'lodash'</span>)<span class="op">;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true"></a></span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true"></a><span class="kw">const</span> app_variant <span class="op">=</span> <span class="bu">process</span><span class="op">.</span><span class="at">env</span><span class="op">.</span><span class="at">APP_VARIANT</span><span class="op">;</span></span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true"></a><span class="cf">if</span> (<span class="op">!</span>[<span class="kw">undefined</span><span class="op">,</span> <span class="st">'development'</span><span class="op">,</span> <span class="st">'preview'</span><span class="op">,</span> <span class="st">'production'</span>]<span class="op">.</span><span class="fu">includes</span>(app_variant)) {</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true"></a>  <span class="bu">console</span><span class="op">.</span><span class="fu">error</span>(<span class="st">'Unknown APP_VARIANT: '</span><span class="op">,</span> app_variant)</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true"></a>}</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true"></a><span class="kw">const</span> IS_DEV <span class="op">=</span> <span class="op">!</span>(app_variant <span class="op">===</span> <span class="st">'production'</span>)<span class="op">;</span></span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true"></a></span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true"></a>module<span class="op">.</span><span class="at">exports</span> <span class="op">=</span> ({ config }) <span class="kw">=&gt;</span> {</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true"></a>  <span class="kw">const</span> config2 <span class="op">=</span> {</span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true"></a>    <span class="dt">name</span><span class="op">:</span> IS_DEV <span class="op">?</span> <span class="st">'MyApp (Dev)'</span> <span class="op">:</span> <span class="st">'MyApp'</span><span class="op">,</span></span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true"></a>    <span class="dt">slug</span><span class="op">:</span> <span class="st">'myapp'</span><span class="op">,</span></span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true"></a>    <span class="dt">ios</span><span class="op">:</span> {</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true"></a>      <span class="dt">bundleIdentifier</span><span class="op">:</span> IS_DEV <span class="op">?</span> <span class="st">'com.example.myapp.dev'</span> <span class="op">:</span> <span class="st">'com.example.myapp'</span><span class="op">,</span></span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true"></a>    }<span class="op">,</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true"></a>    <span class="dt">android</span><span class="op">:</span> {</span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true"></a>      <span class="dt">package</span><span class="op">:</span> IS_DEV <span class="op">?</span> <span class="st">'com.example.myapp.dev'</span> <span class="op">:</span> <span class="st">'com.example.myapp'</span><span class="op">,</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true"></a>      <span class="dt">googleServicesFile</span><span class="op">:</span>  IS_DEV <span class="op">?</span> <span class="st">'./google-services-dev.json'</span> <span class="op">:</span> <span class="st">'./google-services.json'</span><span class="op">,</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true"></a>    }<span class="op">,</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true"></a>  }</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true"></a></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true"></a>  <span class="kw">const</span> mergedConfig <span class="op">=</span> _<span class="op">.</span><span class="fu">merge</span>(config<span class="op">,</span> config2)</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true"></a>  <span class="cf">return</span> mergedConfig<span class="op">;</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true"></a>}<span class="op">;</span></span></code></pre></div>
+<p>这里的 <code>android.googleServicesFile</code> 用来选择 <a href="https://docs.expo.dev/versions/latest/config/app/#googleservicesfile-1">Firebase 配置文件</a>，如果调试版和发布版对应不同的 JSON，那么至少 <code>client_info.android_client_info.package_name</code> 键具有不同的值。更规范的做法可参考<a href="https://stackoverflow.com/a/38479169">这个答案</a>。</p>
+<p>如此配置后，就可以用 <code>APP_VARIANT</code> 环境变量来选择变体。</p>
+<p>如果要构建调试版，步骤是：</p>
+<ol type="1">
+<li>定义环境变量 <code>APP_VARIANT</code> 为 <code>development</code></li>
+<li><code>yarn prebuild</code></li>
+<li><code>npx shadow-cljs compile main</code></li>
+<li><code>npx expo run:android</code>，或 <code>cd ./android/</code> 再 <code>gradlew assembleDebug</code></li>
+</ol>
+<p>如果构建发布版，那么：</p>
+<ol type="1">
+<li>定义环境变量 <code>APP_VARIANT</code> 为 <code>production</code></li>
+<li><code>yarn prebuild</code>，必要时加上 <code>--clean</code> 参数</li>
+<li><code>npx shadow-cljs release main</code></li>
+<li>生成 APK（在 <code>android/app/build/outputs/apk/release</code> 目录），以下两种方法任选其一：
+<ul>
+<li><code>npx expo run:android --variant release</code></li>
+<li><code>cd android</code>，执行 <code>./gradlew assembleRelease</code></li>
+</ul></li>
+<li>生成 AAB（用于 Play Store 提交，在 <code>android/app/build/outputs/bundle/release</code> 目录下）
+<ol type="1">
+<li>在 <code>./android/app/build.gradle</code> 中，修改 <code>android.defaultConfig.versionCode</code> 为新的版本号数字。</li>
+<li><code>cd android</code>，执行 <code>./gradlew bundleRelease</code>。</li>
+</ol></li>
+</ol>
+<p>（另外一种特殊情况是付费相关功能的测试。如果只配置了 release 版的 APP ID，那么就把 <code>app.json</code> 的 <code>package: IS_DEV ? 'com.example.myapp.dev' : ...</code> 这里临时改回 release ID，就可以在调试版中测试 Billing。）</p>
+<h2 id="使用-expo-构建发布版应用">使用 Expo 构建发布版应用</h2>
+<p>Expo 官方推荐用 EAS Build，但如果我们想在本地构建，而非依赖他们的服务呢？据我所知，只能使用自定义的插件才能完成签名的关键一步。</p>
+<h3 id="生成-keystore">生成 keystore</h3>
+<div class="sourceCode" id="cb3"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true"></a><span class="ex">keytool</span> -genkey -v -keystore ./myapp.keystore -alias myapp-release-key -storepass <span class="va">$PASSWORD</span> -keypass <span class="va">$PASSWORD</span> -keyalg RSA -keysize 2048 -validity 10000 -dname <span class="st">&quot;CN=Android Release,O=Android,C=US&quot;</span></span></code></pre></div>
+<p><code>keytool -keystore .\myapp.keystore -list -v</code> 查看 SHA1，并更新 Google Cloud » Credentials » OAuth 2.0 Client 以及 Google Play Console » Setup » App signing。</p>
+<p>记得在 <code>.gitignore</code> 中加入一行 <code>*.keystore</code>。</p>
+<h3 id="配置插件">配置插件</h3>
+<p>我们把插件统一放在 <code>./plugins</code> 目录下。因为要在 Gradle 脚本中加入签名的配置，所以在 <code>app.json</code> 里增加一行：</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode diff"><code class="sourceCode diff"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true"></a><span class="st">-      ]</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true"></a><span class="va">+      ],</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true"></a><span class="va">+      &quot;./plugins/inject-signing-config.js&quot;</span></span></code></pre></div>
+<p><code>inject-signing-config.js</code> 插件的内容如下：</p>
+<div class="sourceCode" id="cb5"><pre class="sourceCode js"><code class="sourceCode javascript"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true"></a><span class="kw">const</span> { withAppBuildGradle } <span class="op">=</span> <span class="pp">require</span>(<span class="st">&quot;@expo/config-plugins&quot;</span>)<span class="op">;</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true"></a></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true"></a><span class="kw">function</span> <span class="fu">withSigningConfigs</span>(config) {</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true"></a>  <span class="cf">return</span> <span class="fu">withAppBuildGradle</span>(config<span class="op">,</span> (config) <span class="kw">=&gt;</span> {</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true"></a>    config<span class="op">.</span><span class="at">modResults</span><span class="op">.</span><span class="at">contents</span> <span class="op">=</span> <span class="fu">injectSigningConfig</span>(config<span class="op">.</span><span class="at">modResults</span><span class="op">.</span><span class="at">contents</span>)<span class="op">;</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true"></a>    <span class="cf">return</span> config<span class="op">;</span></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true"></a>  })<span class="op">;</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true"></a>}</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true"></a></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true"></a><span class="kw">function</span> <span class="fu">injectSigningConfig</span>(contents) {</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true"></a>  <span class="kw">const</span> scriptName <span class="op">=</span> <span class="st">'signing-config.gradle'</span><span class="op">;</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true"></a>  <span class="cf">if</span> (contents<span class="op">.</span><span class="fu">includes</span>(scriptName)) {</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true"></a>    <span class="cf">return</span> contents<span class="op">;</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true"></a>  } <span class="cf">else</span> {</span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true"></a>    <span class="cf">return</span> contents <span class="op">+</span> <span class="vs">`</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true"></a><span class="vs">apply from: &quot;../../plugins/</span><span class="sc">${</span>scriptName<span class="sc">}</span><span class="vs">&quot;</span></span>
+<span id="cb5-17"><a href="#cb5-17" aria-hidden="true"></a><span class="vs">`</span><span class="op">;</span></span>
+<span id="cb5-18"><a href="#cb5-18" aria-hidden="true"></a>  }</span>
+<span id="cb5-19"><a href="#cb5-19" aria-hidden="true"></a>}</span>
+<span id="cb5-20"><a href="#cb5-20" aria-hidden="true"></a></span>
+<span id="cb5-21"><a href="#cb5-21" aria-hidden="true"></a>exports<span class="op">.</span><span class="at">default</span> <span class="op">=</span> withSigningConfigs<span class="op">;</span></span></code></pre></div>
+<p>这个插件用到了 <code>withAppBuildGradle</code> mod，会去 patch <code>./android/app/build.gradle</code> 文件（注意不是 <code>./android/build.gradle</code>）。由于该 mod 是基于本文替换的方式，<a href="https://docs.expo.dev/config-plugins/plugins-and-mods/">Expo 文档</a> 上把它标记为 Dangerous，所以我们希望这里修改的内容尽可能少，只是加上了一行 <code>apply from: "../../plugins/signing-config.gradle"</code>，在构建过程中去调用我们自定义的脚本。具体的逻辑都放在脚本 <code>signing-config.gradle</code> 里，内容如下：</p>
+<pre class="gradle"><code>android {
+    signingConfigs {
+        release {
+            storeFile file('../../myapp.keystore')
+            storePassword System.getenv('MYAPP_STORE_PASSWORD')
+            keyAlias 'myapp-release-key'
+            keyPassword System.getenv('MYAPP_KEY_PASSWORD')
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+        }
+    }
+}</code></pre>
+<p>它的作用是去加载 <code>myapp.keystore</code> 文件，并使用环境变量中定义的密码。这两个文件都可加入源码版本控制，但密码应排除在外，因此使用环境变量。</p>
+<p>打包发布之前，把 <code>MYAPP_STORE_PASSWORD</code> 和 <code>MYAPP_KEY_PASSWORD</code> 设置成前面的 keystore 密码，即可生成适用于 Play Store 提交的带签名 AAB 文件。</p>
+
+        </div>
+        <div id="footer">
+            Copyright &copy; 2015 - Yukun Guo -
+            Powered by <a href="http://jaspervdj.be/hakyll">Hakyll</a>
+        </div>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.css" integrity="sha384-BdGj8xC2eZkQaxoQ8nSLefg4AV4/AwB3Fj+8SUSo7pnKP6Eoy18liIKTPn9oBYNG" crossorigin="anonymous">
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/katex.min.js" integrity="sha384-JiKN5O8x9Hhs/UE5cT5AAJqieYlOZbGT3CHws/y97o3ty4R7/O5poG9F3JoiOYw1" crossorigin="anonymous"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/katex@0.11.0/dist/contrib/auto-render.min.js" integrity="sha384-kWPLUVMOks5AQFrykwIup5lo0m3iMkkHrD0uJ4H5cjeGihAutqP0yW0J6dpFiVkI" crossorigin="anonymous" onload="renderMathInElement(document.body,);"></script>
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-KNSY6VRL5Y"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-KNSY6VRL5Y');
+    </script>
+    </body>
+</html>
